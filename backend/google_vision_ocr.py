@@ -75,65 +75,537 @@ class GoogleVisionCardRecognizer:
         
     def analyze_poker_image_vision(self, image_base64: str, phase_hint: str = None) -> Dict[str, Any]:
         """
-        Analyse une image de poker avec Google Vision API
+        Analyse optimisée d'une image de table de poker avec Google Vision API
         
         Args:
             image_base64: Image encodée en base64
             phase_hint: Indication de la phase (preflop, flop, turn, river)
             
         Returns:
-            Dict contenant les éléments détectés
+            Dict contenant les éléments détectés et les demandes d'informations manquantes
         """
         try:
-            print(f"🔍 Google Vision OCR - Phase: {phase_hint or 'auto'}")
+            print(f"🔍 Google Vision OCR - Analyse table poker - Phase: {phase_hint or 'auto'}")
             
-            # Préprocessing de l'image pour améliorer l'OCR
-            optimized_image_b64 = self.preprocess_image_for_ocr(image_base64)
+            # Préprocessing spécialisé pour tables de poker
+            optimized_image_b64 = self.preprocess_poker_table_image(image_base64)
             
-            # Appel à l'API Google Vision
-            ocr_results = self.call_vision_api(optimized_image_b64)
+            # Appel à l'API Google Vision avec configuration optimisée pour poker
+            ocr_results = self.call_vision_api_optimized(optimized_image_b64)
             
-            # Extraction des cartes depuis le texte OCR
-            hero_cards, board_cards = self.extract_cards_from_ocr(ocr_results, phase_hint)
+            # Analyse spécialisée pour tables de poker
+            poker_analysis = self.analyze_poker_table_layout(ocr_results, phase_hint)
             
-            # Génération des autres données (pot, blinds, etc.)
-            pot_value = self.estimate_pot_from_ocr(ocr_results)
-            blinds = self.estimate_blinds(pot_value)
+            # Validation et demandes d'informations manquantes
+            validated_result = self.validate_and_request_missing_info(poker_analysis, phase_hint)
             
-            # Validation de la phase
-            final_phase = self.validate_phase_with_cards(phase_hint, board_cards)
-            
-            result = {
-                "blinds": {
-                    "small_blind": blinds['sb'],
-                    "big_blind": blinds['bb'],
-                    "ante": 0
-                },
-                "pot": pot_value,
-                "hero_cards": hero_cards,
-                "community_cards": board_cards,
-                "players": [
-                    {
-                        "position": "dealer",
-                        "name": "Hero", 
-                        "stack": 1500,
-                        "current_bet": 0,
-                        "last_action": None,
-                        "is_active": True
-                    }
-                ],
-                "betting_round": final_phase,
-                "confidence_level": 0.9,
-                "analysis_method": "google_vision_api",
-                "ocr_raw_text": ocr_results.get('full_text', '')
-            }
-            
-            print(f"✅ Vision API: Phase={final_phase}, Hero={len(hero_cards)}, Board={len(board_cards)}")
-            return result
+            return validated_result
             
         except Exception as e:
             print(f"❌ Erreur Google Vision API: {e}")
-            return self.get_fallback_result(phase_hint, str(e))
+            # Ne pas utiliser de fallback aléatoire, mais demander les infos à l'utilisateur
+            return self.request_user_input_for_analysis(phase_hint, str(e))
+    
+    def preprocess_poker_table_image(self, image_base64: str) -> str:
+        """Prétraitement spécialisé pour images de tables de poker"""
+        try:
+            print("🎯 Préprocessing spécialisé pour table de poker...")
+            
+            # Décoder l'image
+            image_data = base64.b64decode(image_base64)
+            image = Image.open(io.BytesIO(image_data))
+            
+            # Convertir en RGB si nécessaire
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+            
+            # Optimisations spéciales pour tables de poker
+            
+            # 1. Amélioration du contraste pour mieux voir les cartes
+            enhancer = ImageEnhance.Contrast(image)
+            image = enhancer.enhance(1.8)  # Contraste plus élevé
+            
+            # 2. Amélioration de la netteté pour les textes de cartes
+            sharpness = ImageEnhance.Sharpness(image)
+            image = sharpness.enhance(2.0)  # Netteté maximale
+            
+            # 3. Amélioration de la luminosité pour les tables sombres
+            brightness = ImageEnhance.Brightness(image)
+            image = brightness.enhance(1.2)
+            
+            # 4. Détection et amélioration des zones de cartes
+            image = self.enhance_card_regions(image)
+            
+            # Reconvertir en base64
+            buffer = io.BytesIO()
+            image.save(buffer, format='PNG', optimize=True, quality=95)
+            optimized_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            
+            print("✅ Préprocessing poker terminé")
+            return optimized_b64
+            
+        except Exception as e:
+            print(f"⚠️ Erreur préprocessing, utilisation image originale: {e}")
+            return image_base64
+    
+    def enhance_card_regions(self, image: Image.Image) -> Image.Image:
+        """Améliore spécifiquement les zones où se trouvent généralement les cartes"""
+        try:
+            # Convertir en numpy pour OpenCV
+            img_array = np.array(image)
+            
+            # Appliquer un filtre pour améliorer les contours (cartes)
+            kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+            img_array = cv2.filter2D(img_array, -1, kernel)
+            
+            # Améliorer les zones blanches (cartes) 
+            # Les cartes sont généralement blanches/claires sur fond sombre
+            hsv = cv2.cvtColor(img_array, cv2.COLOR_RGB2HSV)
+            
+            # Masque pour détecter les zones claires (cartes potentielles)
+            lower_white = np.array([0, 0, 200])  # Zones très claires
+            upper_white = np.array([180, 30, 255])
+            mask = cv2.inRange(hsv, lower_white, upper_white)
+            
+            # Appliquer une amélioration sur les zones de cartes détectées
+            enhanced = img_array.copy()
+            enhanced[mask > 0] = cv2.addWeighted(img_array, 0.7, 
+                                               np.full_like(img_array, 255), 0.3, 0)[mask > 0]
+            
+            return Image.fromarray(enhanced)
+            
+        except Exception as e:
+            print(f"⚠️ Erreur amélioration zones cartes: {e}")
+            return image
+    
+    def call_vision_api_optimized(self, image_base64: str) -> Dict[str, Any]:
+        """Appel optimisé à Google Vision API pour reconnaissance de poker"""
+        try:
+            print("📡 Appel Google Vision API optimisé pour poker...")
+            
+            # Configuration spécialisée pour tables de poker
+            request_data = {
+                "requests": [
+                    {
+                        "image": {
+                            "content": image_base64
+                        },
+                        "features": [
+                            {
+                                "type": "TEXT_DETECTION",
+                                "maxResults": 100  # Plus de résultats pour capturer toutes les cartes
+                            },
+                            {
+                                "type": "OBJECT_LOCALIZATION", 
+                                "maxResults": 50   # Détecter les objets (cartes, jetons)
+                            }
+                        ],
+                        "imageContext": {
+                            "languageHints": ["en", "fr"],
+                            "textDetectionParams": {
+                                "enableTextDetectionConfidenceScore": True
+                            }
+                        }
+                    }
+                ]
+            }
+            
+            headers = {
+                'Content-Type': 'application/json',
+            }
+            
+            url_with_key = f"{self.api_url}?key={self.api_key}"
+            
+            print(f"🔑 Utilisation clé API: ***{self.api_key[-4:]}")
+            
+            response = requests.post(
+                url_with_key,
+                headers=headers,
+                json=request_data,
+                timeout=15  # Timeout plus long pour traitement complexe
+            )
+            
+            print(f"📊 Réponse API: Status {response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if 'responses' in data and len(data['responses']) > 0:
+                    response_data = data['responses'][0]
+                    
+                    if 'error' in response_data:
+                        raise Exception(f"Vision API Error: {response_data['error']}")
+                    
+                    # Extraire textes ET objets
+                    text_annotations = response_data.get('textAnnotations', [])
+                    localized_objects = response_data.get('localizedObjectAnnotations', [])
+                    
+                    result = {
+                        'full_text': '',
+                        'individual_texts': [],
+                        'text_annotations': [],
+                        'objects': localized_objects,
+                        'raw_response': response_data
+                    }
+                    
+                    if text_annotations:
+                        result['full_text'] = text_annotations[0].get('description', '')
+                        result['individual_texts'] = [ann.get('description', '') for ann in text_annotations[1:]]
+                        result['text_annotations'] = text_annotations
+                    
+                    print(f"✅ Vision API: {len(text_annotations)} textes, {len(localized_objects)} objets détectés")
+                    return result
+                else:
+                    raise Exception("Pas de réponse dans les données API")
+                    
+            else:
+                error_detail = response.text
+                print(f"❌ Erreur API {response.status_code}: {error_detail}")
+                raise Exception(f"Erreur API HTTP {response.status_code}: {error_detail}")
+                
+        except Exception as e:
+            print(f"❌ Erreur appel Vision API: {e}")
+            raise e
+    
+    def analyze_poker_table_layout(self, ocr_results: Dict[str, Any], phase_hint: str) -> Dict[str, Any]:
+        """Analyse spécialisée pour layout de table de poker"""
+        try:
+            print("🎯 Analyse layout table de poker...")
+            
+            full_text = ocr_results.get('full_text', '').upper()
+            text_annotations = ocr_results.get('text_annotations', [])
+            objects = ocr_results.get('objects', [])
+            
+            print(f"📝 Texte complet détecté: '{full_text}'")
+            print(f"📊 {len(text_annotations)} annotations, {len(objects)} objets")
+            
+            # Analyse des cartes par zones
+            hero_cards = self.detect_hero_cards(text_annotations, full_text)
+            board_cards = self.detect_community_cards(text_annotations, full_text, phase_hint)
+            
+            # Analyse des informations de jeu
+            pot_info = self.detect_pot_and_bets(text_annotations, full_text)
+            player_info = self.detect_players_and_positions(text_annotations, objects)
+            
+            # Validation des détections
+            confidence_score = self.calculate_detection_confidence(hero_cards, board_cards, pot_info, phase_hint)
+            
+            result = {
+                "hero_cards": hero_cards,
+                "community_cards": board_cards,
+                "pot_info": pot_info,
+                "player_info": player_info,
+                "confidence_score": confidence_score,
+                "phase_detected": self.determine_phase_from_detections(board_cards, phase_hint),
+                "raw_detections": {
+                    "full_text": full_text,
+                    "annotations_count": len(text_annotations),
+                    "objects_count": len(objects)
+                }
+            }
+            
+            print(f"🎯 Analyse terminée: Hero={len(hero_cards)}, Board={len(board_cards)}, Confiance={confidence_score:.2f}")
+            
+            return result
+            
+        except Exception as e:
+            print(f"❌ Erreur analyse layout: {e}")
+            raise e
+    
+    def detect_hero_cards(self, text_annotations: List[Dict], full_text: str) -> List[str]:
+        """Détecte les cartes du héros avec analyse de position"""
+        cards = []
+        
+        print("🃏 Recherche cartes héros...")
+        
+        # Stratégie 1: Recherche de patterns de cartes dans les annotations
+        for annotation in text_annotations[1:]:  # Skip le premier (texte complet)
+            text = annotation.get('description', '').upper().strip()
+            vertices = annotation.get('boundingPoly', {}).get('vertices', [])
+            
+            # Calculer position approximative
+            if vertices and len(vertices) >= 2:
+                avg_y = sum(v.get('y', 0) for v in vertices) / len(vertices)
+                avg_x = sum(v.get('x', 0) for v in vertices) / len(vertices)
+                
+                # Les cartes héros sont généralement en bas de l'écran
+                is_hero_position = avg_y > 600  # Ajuster selon résolution
+                
+                if is_hero_position:
+                    card = self.parse_single_card(text)
+                    if card and card not in cards:
+                        cards.append(card)
+                        print(f"🎯 Carte héros détectée: {card} à position ({avg_x:.0f}, {avg_y:.0f})")
+        
+        # Stratégie 2: Patterns dans le texte complet
+        if len(cards) < 2:
+            regex_cards = self.find_cards_with_regex(full_text)
+            for card in regex_cards:
+                if card not in cards and len(cards) < 2:
+                    cards.append(card)
+        
+        print(f"✅ Cartes héros trouvées: {cards}")
+        return cards[:2]  # Maximum 2 cartes
+    
+    def detect_community_cards(self, text_annotations: List[Dict], full_text: str, phase_hint: str) -> List[str]:
+        """Détecte les cartes communes avec analyse de position centrale"""
+        cards = []
+        expected_count = {'preflop': 0, 'flop': 3, 'turn': 4, 'river': 5}.get(phase_hint, 0)
+        
+        print(f"🎯 Recherche {expected_count} cartes communes pour phase {phase_hint}...")
+        
+        if expected_count == 0:
+            return []
+        
+        # Recherche dans les annotations avec position centrale
+        for annotation in text_annotations[1:]:
+            text = annotation.get('description', '').upper().strip()
+            vertices = annotation.get('boundingPoly', {}).get('vertices', [])
+            
+            if vertices and len(vertices) >= 2:
+                avg_y = sum(v.get('y', 0) for v in vertices) / len(vertices)
+                avg_x = sum(v.get('x', 0) for v in vertices) / len(vertices)
+                
+                # Les cartes communes sont au centre de la table
+                is_center_position = (300 < avg_y < 600) and (200 < avg_x < 800)
+                
+                if is_center_position:
+                    card = self.parse_single_card(text)
+                    if card and card not in cards:
+                        cards.append(card)
+                        print(f"🃏 Carte commune détectée: {card} à position ({avg_x:.0f}, {avg_y:.0f})")
+        
+        # Si pas assez de cartes détectées, chercher dans le texte complet
+        if len(cards) < expected_count:
+            regex_cards = self.find_cards_with_regex(full_text)
+            for card in regex_cards:
+                if card not in cards and len(cards) < expected_count:
+                    cards.append(card)
+        
+        print(f"✅ Cartes communes trouvées: {cards} (attendu: {expected_count})")
+        return cards[:expected_count]
+    
+    def parse_single_card(self, text: str) -> Optional[str]:
+        """Parse une carte individuelle depuis du texte"""
+        if not text or len(text) < 2:
+            return None
+        
+        # Nettoyer le texte
+        text = text.strip().upper()
+        
+        # Pattern direct (AS, KH, etc.)
+        import re
+        card_pattern = r'^([AKQJT2-9]|10)([♠♥♦♣SHDC])$'
+        match = re.match(card_pattern, text)
+        
+        if match:
+            rank, suit = match.groups()
+            normalized_rank = self.normalize_rank(rank)
+            normalized_suit = self.normalize_suit(suit)
+            
+            if normalized_rank and normalized_suit:
+                return f"{normalized_rank}{normalized_suit}"
+        
+        # Tentatives de correction d'OCR
+        corrections = {
+            'O': '0', 'I': '1', 'L': '1', 'S': '5', 'Z': '2'
+        }
+        
+        for old, new in corrections.items():
+            corrected = text.replace(old, new)
+            if corrected != text:
+                return self.parse_single_card(corrected)
+        
+        return None
+    
+    def find_cards_with_regex(self, text: str) -> List[str]:
+        """Trouve toutes les cartes dans un texte avec regex"""
+        import re
+        
+        cards = []
+        # Pattern pour cartes avec symboles unicode
+        pattern1 = r'([AKQJT2-9]|10)([♠♥♦♣])'
+        matches1 = re.findall(pattern1, text)
+        
+        for rank, suit in matches1:
+            normalized_rank = self.normalize_rank(rank)
+            normalized_suit = self.normalize_suit(suit)
+            if normalized_rank and normalized_suit:
+                card = f"{normalized_rank}{normalized_suit}"
+                if card not in cards:
+                    cards.append(card)
+        
+        # Pattern pour cartes avec lettres
+        pattern2 = r'([AKQJT2-9]|10)([SHDC])'
+        matches2 = re.findall(pattern2, text)
+        
+        for rank, suit in matches2:
+            normalized_rank = self.normalize_rank(rank)
+            normalized_suit = self.normalize_suit(suit)
+            if normalized_rank and normalized_suit:
+                card = f"{normalized_rank}{normalized_suit}"
+                if card not in cards:
+                    cards.append(card)
+        
+        return cards
+    
+    def detect_pot_and_bets(self, text_annotations: List[Dict], full_text: str) -> Dict[str, Any]:
+        """Détecte le pot et les mises"""
+        import re
+        
+        # Chercher des nombres qui pourraient être le pot
+        numbers = re.findall(r'\d+', full_text)
+        numbers = [int(n) for n in numbers if int(n) > 10]  # Filtrer petits nombres
+        
+        pot_value = max(numbers) if numbers else 150
+        
+        return {
+            "pot": pot_value,
+            "detected_numbers": numbers,
+            "confidence": 0.7 if numbers else 0.3
+        }
+    
+    def detect_players_and_positions(self, text_annotations: List[Dict], objects: List[Dict]) -> Dict[str, Any]:
+        """Détecte informations sur les joueurs"""
+        return {
+            "player_count": 3,  # Standard pour Spin & Go
+            "hero_position": "dealer",  # Par défaut
+            "active_players": 3
+        }
+    
+    def calculate_detection_confidence(self, hero_cards: List[str], board_cards: List[str], 
+                                     pot_info: Dict, phase_hint: str) -> float:
+        """Calcule un score de confiance global"""
+        confidence = 0.0
+        
+        # Confiance cartes héros
+        if len(hero_cards) == 2:
+            confidence += 0.4
+        elif len(hero_cards) == 1:
+            confidence += 0.2
+        
+        # Confiance cartes communes
+        expected_board = {'preflop': 0, 'flop': 3, 'turn': 4, 'river': 5}.get(phase_hint, 0)
+        if len(board_cards) == expected_board:
+            confidence += 0.4
+        elif abs(len(board_cards) - expected_board) <= 1:
+            confidence += 0.2
+        
+        # Confiance pot
+        confidence += pot_info.get("confidence", 0.0) * 0.2
+        
+        return min(confidence, 1.0)
+    
+    def determine_phase_from_detections(self, board_cards: List[str], phase_hint: str) -> str:
+        """Détermine la phase basée sur les détections"""
+        detected_count = len(board_cards)
+        
+        phase_map = {0: 'preflop', 3: 'flop', 4: 'turn', 5: 'river'}
+        detected_phase = phase_map.get(detected_count, 'unknown')
+        
+        # Si phase_hint fourni et cohérent, l'utiliser
+        if phase_hint and phase_hint in ['preflop', 'flop', 'turn', 'river']:
+            expected = {'preflop': 0, 'flop': 3, 'turn': 4, 'river': 5}[phase_hint]
+            if detected_count == expected:
+                return phase_hint
+        
+        return detected_phase
+    
+    def validate_and_request_missing_info(self, poker_analysis: Dict[str, Any], phase_hint: str) -> Dict[str, Any]:
+        """Valide l'analyse et identifie les informations manquantes"""
+        
+        hero_cards = poker_analysis.get("hero_cards", [])
+        board_cards = poker_analysis.get("community_cards", [])
+        confidence = poker_analysis.get("confidence_score", 0.0)
+        
+        missing_info = []
+        user_requests = []
+        
+        # Vérifier cartes héros
+        if len(hero_cards) < 2:
+            missing_info.append("hero_cards")
+            user_requests.append({
+                "type": "hero_cards",
+                "message": f"Seulement {len(hero_cards)} carte(s) héros détectée(s). Quelles sont vos 2 cartes ? (format: AS KH)",
+                "detected": hero_cards
+            })
+        
+        # Vérifier cartes communes selon la phase
+        expected_board = {'preflop': 0, 'flop': 3, 'turn': 4, 'river': 5}.get(phase_hint, 0)
+        if len(board_cards) != expected_board and expected_board > 0:
+            missing_info.append("community_cards")
+            user_requests.append({
+                "type": "community_cards", 
+                "message": f"Phase {phase_hint}: {len(board_cards)}/{expected_board} cartes communes détectées. Quelles sont les cartes du board ? (format: AS KH QD)",
+                "detected": board_cards,
+                "expected_count": expected_board
+            })
+        
+        # Construire le résultat final
+        result = {
+            "blinds": {"small_blind": 25, "big_blind": 50, "ante": 0},
+            "pot": poker_analysis.get("pot_info", {}).get("pot", 150),
+            "hero_cards": hero_cards,
+            "community_cards": board_cards,
+            "players": [{
+                "position": "dealer", "name": "Hero", "stack": 1500, 
+                "current_bet": 0, "last_action": None, "is_active": True
+            }],
+            "betting_round": poker_analysis.get("phase_detected", phase_hint or 'preflop'),
+            "confidence_level": confidence,
+            "analysis_method": "google_vision_api",
+            "detection_quality": "high" if confidence > 0.8 else "medium" if confidence > 0.5 else "low",
+            "missing_information": missing_info,
+            "user_requests": user_requests,
+            "needs_user_input": len(user_requests) > 0,
+            "raw_detections": poker_analysis.get("raw_detections", {})
+        }
+        
+        if user_requests:
+            print(f"⚠️ Informations manquantes: {missing_info}")
+            print(f"🙋 Demandes utilisateur: {len(user_requests)}")
+        else:
+            print("✅ Toutes les informations détectées avec succès")
+        
+        return result
+    
+    def request_user_input_for_analysis(self, phase_hint: str, error_msg: str) -> Dict[str, Any]:
+        """Demande les informations à l'utilisateur quand l'API échoue"""
+        
+        expected_board = {'preflop': 0, 'flop': 3, 'turn': 4, 'river': 5}.get(phase_hint, 0)
+        
+        user_requests = [
+            {
+                "type": "hero_cards",
+                "message": "L'analyse automatique a échoué. Quelles sont vos 2 cartes ? (format: AS KH)",
+                "detected": []
+            }
+        ]
+        
+        if expected_board > 0:
+            user_requests.append({
+                "type": "community_cards",
+                "message": f"Quelles sont les {expected_board} cartes du board pour la phase {phase_hint} ? (format: AS KH QD)",
+                "detected": [],
+                "expected_count": expected_board
+            })
+        
+        return {
+            "blinds": {"small_blind": 25, "big_blind": 50, "ante": 0},
+            "pot": 150,
+            "hero_cards": [],
+            "community_cards": [],
+            "players": [{"position": "dealer", "name": "Hero", "stack": 1500, "current_bet": 0, "last_action": None, "is_active": True}],
+            "betting_round": phase_hint or 'preflop',
+            "confidence_level": 0.0,
+            "analysis_method": "user_input_required",
+            "detection_quality": "failed",
+            "missing_information": ["hero_cards", "community_cards"] if expected_board > 0 else ["hero_cards"],
+            "user_requests": user_requests,
+            "needs_user_input": True,
+            "error": error_msg,
+            "api_failure": True
+        }
             
     def preprocess_image_for_ocr(self, image_base64: str) -> str:
         """Prétraitement de l'image pour améliorer la reconnaissance OCR"""
