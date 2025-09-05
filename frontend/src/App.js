@@ -1048,90 +1048,182 @@ function App() {
               </div>
             )}
 
-            {/* NOUVEAU : Interface de saisie des cartes manquantes */}
+            {/* NOUVEAU : Interface de sélection de cartes avec beau design */}
             {showCardInput && (
-              <div className="bg-gradient-to-r from-orange-900/20 to-red-900/20 border border-orange-500/30 rounded-xl p-6 mb-6">
+              <div className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 border border-purple-500/30 rounded-xl p-6 mb-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <AlertTriangle className="w-5 h-5 text-orange-400" />
-                  <h2 className="text-lg font-semibold text-orange-100">🙋 Saisie Manuelle Requise</h2>
-                  <span className="px-2 py-1 bg-orange-900/30 text-orange-300 text-xs rounded-lg">
-                    OCR Incomplet
+                  <Target className="w-5 h-5 text-purple-400" />
+                  <h2 className="text-lg font-semibold text-purple-100">🎯 Sélection de Cartes</h2>
+                  <span className="px-2 py-1 bg-purple-900/30 text-purple-300 text-xs rounded-lg">
+                    OCR Correction
                   </span>
                 </div>
                 
-                <div className="mb-4 p-3 bg-orange-900/20 rounded-lg">
-                  <p className="text-sm text-orange-200 mb-2">
-                    🤖 <strong>Google Vision API</strong> n'a pas pu détecter toutes les cartes. 
-                    Veuillez saisir les informations manquantes :
+                <div className="mb-4 p-3 bg-purple-900/20 rounded-lg">
+                  <p className="text-sm text-purple-200 mb-2">
+                    🤖 <strong>Google Vision + IA</strong> a détecté partiellement les cartes. 
+                    Sélectionnez les cartes manquantes ou corrigez les erreurs :
                   </p>
                   {userRequests.map((req, index) => (
-                    <div key={index} className="text-xs text-orange-300 mb-1">
+                    <div key={index} className="text-xs text-purple-300 mb-1">
                       • {req.message}
                     </div>
                   ))}
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  {/* Saisie cartes héros */}
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      🃏 Vos cartes (2 cartes requises)
-                    </label>
-                    <input
-                      type="text"
-                      value={inputHeroCards}
-                      onChange={(e) => setInputHeroCards(e.target.value)}
-                      placeholder="Ex: AS KH"
-                      className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-orange-400 focus:outline-none"
-                    />
-                    <div className="text-xs text-slate-400 mt-1">
-                      Format: Rang (A,K,Q,J,T,9-2) + Couleur (S,H,D,C)
-                    </div>
-                  </div>
-                  
-                  {/* Saisie cartes board */}
+
+                {/* Onglets de sélection */}
+                <div className="flex mb-4 bg-slate-800 rounded-lg p-1">
+                  <button
+                    onClick={() => setCardSelectionStep('hero')}
+                    className={`flex-1 py-2 px-4 rounded-md transition-colors font-medium ${
+                      cardSelectionStep === 'hero'
+                        ? 'bg-purple-600 text-white'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    🃏 Mes Cartes ({selectedHeroCards.length}/2)
+                  </button>
                   {currentPhase !== 'preflop' && (
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">
-                        🎯 Cartes Board ({currentPhase === 'flop' ? '3' : currentPhase === 'turn' ? '4' : '5'} cartes)
-                      </label>
-                      <input
-                        type="text"
-                        value={inputBoardCards}
-                        onChange={(e) => setInputBoardCards(e.target.value)}
-                        placeholder={currentPhase === 'flop' ? "Ex: AS KH QD" : currentPhase === 'turn' ? "Ex: AS KH QD JC" : "Ex: AS KH QD JC TS"}
-                        className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-orange-400 focus:outline-none"
-                      />
-                      <div className="text-xs text-slate-400 mt-1">
-                        Séparez les cartes par des espaces
-                      </div>
-                    </div>
+                    <button
+                      onClick={() => setCardSelectionStep('board')}
+                      className={`flex-1 py-2 px-4 rounded-md transition-colors font-medium ${
+                        cardSelectionStep === 'board'
+                          ? 'bg-blue-600 text-white'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      🎯 Board ({selectedBoardCards.length}/{
+                        { 'flop': 3, 'turn': 4, 'river': 5 }[currentPhase] || 3
+                      })
+                    </button>
                   )}
                 </div>
+
+                {/* Grille de sélection de cartes */}
+                <div className="mb-6">
+                  <h3 className="text-sm font-medium text-slate-300 mb-3">
+                    {cardSelectionStep === 'hero' 
+                      ? `🃏 Sélectionnez vos 2 cartes (${selectedHeroCards.length}/2)`
+                      : `🎯 Sélectionnez les cartes du board (${selectedBoardCards.length}/${
+                          { 'flop': 3, 'turn': 4, 'river': 5 }[currentPhase] || 3
+                        })`
+                    }
+                  </h3>
+                  
+                  {/* Grille par couleurs */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {SUITS.map((suit) => (
+                      <div key={suit.code} className="bg-slate-800/50 rounded-lg p-3">
+                        <div className={`text-center mb-2 font-semibold ${suit.color}`}>
+                          <span className="text-2xl">{suit.symbol}</span>
+                          <div className="text-xs text-slate-400">{suit.name}</div>
+                        </div>
+                        <div className="grid grid-cols-4 gap-1">
+                          {RANKS.map((rank) => {
+                            const isSelected = isCardSelected(rank, suit.code);
+                            const isDisabled = 
+                              (cardSelectionStep === 'hero' && selectedHeroCards.length >= 2 && !isSelected) ||
+                              (cardSelectionStep === 'board' && 
+                                selectedBoardCards.length >= ({ 'flop': 3, 'turn': 4, 'river': 5 }[currentPhase] || 3) && 
+                                !isSelected);
+                            
+                            return (
+                              <button
+                                key={`${rank}${suit.code}`}
+                                onClick={() => !isDisabled && toggleCardSelection(rank, suit.code)}
+                                disabled={isDisabled}
+                                className={`
+                                  aspect-square text-xs font-bold rounded-md transition-all transform hover:scale-105
+                                  ${isSelected
+                                    ? `${cardSelectionStep === 'hero' ? 'bg-purple-600 border-purple-400' : 'bg-blue-600 border-blue-400'} text-white border-2 shadow-lg`
+                                    : isDisabled
+                                      ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                                      : 'bg-slate-600 hover:bg-slate-500 text-white border border-slate-500'
+                                  }
+                                `}
+                              >
+                                {rank}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Cartes sélectionnées */}
+                <div className="mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-purple-900/20 rounded-lg p-3">
+                      <h4 className="text-sm font-medium text-purple-300 mb-2">🃏 Mes Cartes</h4>
+                      <div className="flex gap-2">
+                        {selectedHeroCards.map((card, index) => (
+                          <div key={index} className="bg-purple-700 text-white px-3 py-1 rounded-md text-sm font-bold">
+                            {card.rank}{SUITS.find(s => s.code === card.suit)?.symbol}
+                          </div>
+                        ))}
+                        {Array.from({ length: 2 - selectedHeroCards.length }).map((_, index) => (
+                          <div key={`empty-hero-${index}`} className="border-2 border-dashed border-purple-500 px-3 py-1 rounded-md text-sm text-purple-400">
+                            ?
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {currentPhase !== 'preflop' && (
+                      <div className="bg-blue-900/20 rounded-lg p-3">
+                        <h4 className="text-sm font-medium text-blue-300 mb-2">🎯 Board ({currentPhase})</h4>
+                        <div className="flex gap-2 flex-wrap">
+                          {selectedBoardCards.map((card, index) => (
+                            <div key={index} className="bg-blue-700 text-white px-3 py-1 rounded-md text-sm font-bold">
+                              {card.rank}{SUITS.find(s => s.code === card.suit)?.symbol}
+                            </div>
+                          ))}
+                          {Array.from({ 
+                            length: ({ 'flop': 3, 'turn': 4, 'river': 5 }[currentPhase] || 3) - selectedBoardCards.length 
+                          }).map((_, index) => (
+                            <div key={`empty-board-${index}`} className="border-2 border-dashed border-blue-500 px-3 py-1 rounded-md text-sm text-blue-400">
+                              ?
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
                 
+                {/* Boutons d'action */}
                 <div className="flex gap-3">
                   <button
                     onClick={completeAnalysisWithUserInput}
-                    disabled={isCompletingAnalysis || !inputHeroCards.trim()}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors font-medium ${
-                      isCompletingAnalysis || !inputHeroCards.trim()
+                    disabled={
+                      isCompletingAnalysis || 
+                      selectedHeroCards.length !== 2 ||
+                      (currentPhase !== 'preflop' && selectedBoardCards.length !== ({ 'flop': 3, 'turn': 4, 'river': 5 }[currentPhase] || 3))
+                    }
+                    className={`flex items-center gap-2 px-6 py-3 rounded-lg transition-colors font-medium ${
+                      isCompletingAnalysis || 
+                      selectedHeroCards.length !== 2 ||
+                      (currentPhase !== 'preflop' && selectedBoardCards.length !== ({ 'flop': 3, 'turn': 4, 'river': 5 }[currentPhase] || 3))
                         ? 'bg-gray-600 cursor-not-allowed text-gray-300'
-                        : 'bg-orange-600 hover:bg-orange-700 text-white'
+                        : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg'
                     }`}
                     type="button"
                   >
                     {isCompletingAnalysis ? <Loader className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                    {isCompletingAnalysis ? 'Analyse...' : 'Analyser avec ces cartes'}
+                    {isCompletingAnalysis ? 'Analyse en cours...' : '🚀 Analyser avec ces cartes'}
                   </button>
                   
                   <button
                     onClick={() => {
                       setShowCardInput(false);
-                      setInputHeroCards('');
-                      setInputBoardCards('');
-                      addLog('❌ Saisie manuelle annulée', 'info');
+                      setSelectedHeroCards([]);
+                      setSelectedBoardCards([]);
+                      setCardSelectionStep('hero');
+                      addLog('❌ Sélection de cartes annulée', 'info');
                     }}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 rounded-lg transition-colors font-medium text-white"
+                    className="flex items-center gap-2 px-4 py-3 bg-slate-600 hover:bg-slate-700 rounded-lg transition-colors font-medium text-white"
                     type="button"
                   >
                     <X className="w-4 h-4" />
