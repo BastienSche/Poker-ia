@@ -521,32 +521,40 @@ class GoogleVisionCardRecognizer:
         missing_info = []
         user_requests = []
         
-        # Vérifier cartes héros
+        # ASSURER QU'IL Y A TOUJOURS DES CARTES POUR L'AFFICHAGE
         if len(hero_cards) < 2:
+            # Générer des cartes temporaires pour l'affichage
+            temp_hero = self.generate_missing_cards([], 2)
+            hero_cards = temp_hero
             missing_info.append("hero_cards")
             user_requests.append({
                 "type": "hero_cards",
-                "message": f"Seulement {len(hero_cards)} carte(s) héros détectée(s). Quelles sont vos 2 cartes ? (format: AS KH)",
-                "detected": hero_cards
+                "message": f"Seulement {len(poker_analysis.get('hero_cards', []))} carte(s) héros détectée(s). Quelles sont vos 2 cartes ? (format: AS KH)",
+                "detected": poker_analysis.get("hero_cards", []),
+                "display_cards": temp_hero
             })
         
         # Vérifier cartes communes selon la phase
         expected_board = {'preflop': 0, 'flop': 3, 'turn': 4, 'river': 5}.get(phase_hint, 0)
         if len(board_cards) != expected_board and expected_board > 0:
+            # Générer des cartes temporaires pour l'affichage
+            temp_board = self.generate_missing_cards(hero_cards, expected_board)
+            board_cards = temp_board
             missing_info.append("community_cards")
             user_requests.append({
                 "type": "community_cards", 
-                "message": f"Phase {phase_hint}: {len(board_cards)}/{expected_board} cartes communes détectées. Quelles sont les cartes du board ? (format: AS KH QD)",
-                "detected": board_cards,
-                "expected_count": expected_board
+                "message": f"Phase {phase_hint}: {len(poker_analysis.get('community_cards', []))}/{expected_board} cartes communes détectées. Quelles sont les cartes du board ? (format: AS KH QD)",
+                "detected": poker_analysis.get("community_cards", []),
+                "expected_count": expected_board,
+                "display_cards": temp_board
             })
         
-        # Construire le résultat final
+        # Construire le résultat final avec cartes d'affichage
         result = {
             "blinds": {"small_blind": 25, "big_blind": 50, "ante": 0},
             "pot": poker_analysis.get("pot_info", {}).get("pot", 150),
-            "hero_cards": hero_cards,
-            "community_cards": board_cards,
+            "hero_cards": hero_cards,  # Inclut cartes détectées OU temporaires
+            "community_cards": board_cards,  # Inclut cartes détectées OU temporaires
             "players": [{
                 "position": "dealer", "name": "Hero", "stack": 1500, 
                 "current_bet": 0, "last_action": None, "is_active": True
@@ -558,11 +566,12 @@ class GoogleVisionCardRecognizer:
             "missing_information": missing_info,
             "user_requests": user_requests,
             "needs_user_input": len(user_requests) > 0,
-            "raw_detections": poker_analysis.get("raw_detections", {})
+            "raw_detections": poker_analysis.get("raw_detections", {}),
+            "display_note": "Cartes détectées automatiquement" if not user_requests else "Cartes temporaires - Veuillez corriger si nécessaire"
         }
         
         if user_requests:
-            print(f"⚠️ Informations manquantes: {missing_info}")
+            print(f"⚠️ Informations manquantes: {missing_info} (cartes d'affichage générées)")
             print(f"🙋 Demandes utilisateur: {len(user_requests)}")
         else:
             print("✅ Toutes les informations détectées avec succès")
