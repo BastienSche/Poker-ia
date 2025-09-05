@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests complets pour l'API Poker Assistant Pro
+Tests complets pour l'API Poker Assistant Pro - Focus sur Phase Detection Bug Fix
 """
 import requests
 import json
