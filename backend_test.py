@@ -37,15 +37,17 @@ class PokerAssistantTester:
         """Test de l'endpoint racine"""
         try:
             response = requests.get(f"{self.api_url}/", timeout=10)
-            expected_message = "Poker Assistant API - Prêt pour l'analyse !"
             
             if response.status_code == 200:
                 data = response.json()
-                if data.get("message") == expected_message:
-                    self.log_test("Endpoint racine", True, f"Message: {data['message']}")
+                message = data.get("message", "")
+                
+                # Vérifier que le message contient des éléments gratuits
+                if "GRATUIT" in message or "gratuit" in message or "free" in message.lower():
+                    self.log_test("Endpoint racine", True, f"Message: {message}")
                     return True
                 else:
-                    self.log_test("Endpoint racine", False, f"Message incorrect: {data}")
+                    self.log_test("Endpoint racine", False, f"Message ne mentionne pas gratuit: {message}")
                     return False
             else:
                 self.log_test("Endpoint racine", False, f"Status {response.status_code}")
