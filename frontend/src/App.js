@@ -722,13 +722,18 @@ function App() {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-600 rounded-lg">
+              <div className="p-2 bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg">
                 <Brain className="w-6 h-6" />
               </div>
               <div>
-                <h1 className="text-xl font-bold">Assistant Poker Pro</h1>
+                <div className="flex items-center gap-3 mb-1">
+                  <h1 className="text-xl font-bold">Assistant Poker Pro</h1>
+                  <div className="px-3 py-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-xs font-bold rounded-full animate-pulse">
+                    🆓 100% GRATUIT !
+                  </div>
+                </div>
                 <p className="text-sm text-slate-400">
-                  🆓 100% GRATUIT • Computer Vision Locale • v4.0 • {currentStatus} {analysisStep && `• ${analysisStep}`}
+                  🚀 Computer Vision Locale • ⚡ Analyse Ultra-Rapide • v4.0 • {currentStatus} {analysisStep && `• ${analysisStep}`}
                 </p>
               </div>
             </div>
