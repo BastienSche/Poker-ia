@@ -12,6 +12,12 @@ import numpy as np
 from PIL import Image, ImageEnhance
 from typing import List, Dict, Tuple, Optional, Any
 import logging
+from dotenv import load_dotenv
+from pathlib import Path
+
+# Load environment variables
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / '.env')
 
 logger = logging.getLogger(__name__)
 
