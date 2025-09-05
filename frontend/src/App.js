@@ -773,6 +773,113 @@ function App() {
           {/* Panel de capture principal */}
           <div className="lg:col-span-2 space-y-6">
             
+            {/* NOUVEAU : Guide d'analyse séquentielle */}
+            {settings.sequentialMode && (
+              <div className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 border border-purple-500/30 rounded-xl p-6 mb-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <Target className="w-5 h-5 text-purple-400" />
+                  <h2 className="text-lg font-semibold">Guide d'Analyse Séquentielle</h2>
+                  <span className="px-2 py-1 bg-purple-900/30 text-purple-300 text-xs rounded-lg">
+                    Phase: {currentPhase.toUpperCase()}
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                  {/* Phases de jeu */}
+                  {['preflop', 'flop', 'turn', 'river'].map((phase, index) => (
+                    <div 
+                      key={phase}
+                      className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
+                        currentPhase === phase 
+                          ? 'border-purple-400 bg-purple-900/30' 
+                          : 'border-slate-600 bg-slate-800/50 hover:border-slate-500'
+                      }`}
+                      onClick={() => setCurrentPhase(phase)}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className={`w-3 h-3 rounded-full ${
+                          currentPhase === phase ? 'bg-purple-400' : 'bg-slate-500'
+                        }`} />
+                        <span className="text-sm font-semibold capitalize">{phase}</span>
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        {phase === 'preflop' ? '0 cartes board' :
+                         phase === 'flop' ? '3 cartes board' :
+                         phase === 'turn' ? '4 cartes board' : '5 cartes board'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Instructions selon la phase */}
+                <div className="bg-slate-900/30 p-4 rounded-lg">
+                  <h4 className="text-sm font-semibold text-purple-300 mb-2">
+                    📋 Instructions pour {currentPhase.toUpperCase()}
+                  </h4>
+                  <p className="text-sm text-slate-300">
+                    {currentPhase === 'preflop' ? 
+                      '🃏 Montrez vos 2 cartes personnelles. Pas de cartes communes visibles.' :
+                     currentPhase === 'flop' ?
+                      '🎯 Montrez vos cartes + exactement 3 cartes communes au centre (le flop).' :
+                     currentPhase === 'turn' ?
+                      '🎲 Montrez vos cartes + 4 cartes communes (flop + turn card).' :
+                      '🏁 Montrez vos cartes + toutes les 5 cartes communes (board complet).'}
+                  </p>
+                  
+                  {/* Bouton d'analyse spécialisée */}
+                  <button
+                    onClick={() => {
+                      addLog(`👆 Analyse ${currentPhase} spécialisée demandée`, 'info');
+                      analyzeScreenWithPhase(currentPhase);
+                    }}
+                    disabled={!isCapturing || isAnalyzing}
+                    className={`mt-3 flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                      !isCapturing || isAnalyzing
+                        ? 'bg-gray-600 cursor-not-allowed text-gray-400'
+                        : 'bg-purple-600 hover:bg-purple-700 text-white'
+                    }`}
+                    type="button"
+                  >
+                    {isAnalyzing ? <Loader className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                    Analyser {currentPhase.toUpperCase()}
+                  </button>
+                </div>
+                
+                {/* Affichage des cartes détectées */}
+                {(detectedCards.hero.length > 0 || detectedCards.board.length > 0) && (
+                  <div className="mt-4 bg-slate-900/30 p-4 rounded-lg">
+                    <h4 className="text-sm font-semibold text-green-300 mb-3">🎯 Cartes Détectées</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {detectedCards.hero.length > 0 && (
+                        <div>
+                          <div className="text-xs text-slate-400 mb-2">Vos cartes :</div>
+                          <div className="flex gap-2">
+                            {detectedCards.hero.map((card, index) => (
+                              <div key={index} className="bg-white text-black px-2 py-1 rounded text-sm font-bold">
+                                {card}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {detectedCards.board.length > 0 && (
+                        <div>
+                          <div className="text-xs text-slate-400 mb-2">Board ({detectedCards.board.length} cartes) :</div>
+                          <div className="flex gap-2">
+                            {detectedCards.board.map((card, index) => (
+                              <div key={index} className="bg-yellow-100 text-black px-2 py-1 rounded text-sm font-bold">
+                                {card}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Contrôles de capture avec debug */}
             <div className="bg-slate-800/50 backdrop-blur rounded-xl p-6 border border-slate-700">
               <div className="flex items-center justify-between mb-4">
