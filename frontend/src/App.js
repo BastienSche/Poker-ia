@@ -717,24 +717,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
-      
-      {/* Banner "100% GRATUIT" très visible */}
-      <div className="bg-gradient-to-r from-green-600 via-emerald-600 to-green-600 text-white">
-        <div className="container mx-auto px-6 py-3">
-          <div className="flex items-center justify-center gap-4 text-center">
-            <div className="flex items-center gap-2">
-              <Zap className="w-5 h-5 animate-pulse" />
-              <span className="font-bold text-lg">100% GRATUIT POUR TOUJOURS !</span>
-              <Zap className="w-5 h-5 animate-pulse" />
-            </div>
-            <div className="hidden md:block text-sm opacity-90">
-              🚀 Computer Vision Locale • ⚡ 0 API Coût • 🔒 Données Privées • 🆓 Usage Illimité
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Header avec statut détaillé */}
+      {/* Header avec statut */}
       <div className="bg-slate-800/50 backdrop-blur border-b border-slate-700">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
