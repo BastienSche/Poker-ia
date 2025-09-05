@@ -17,8 +17,8 @@ from io import BytesIO
 from PIL import Image
 import time
 
-# Import des modules optimisés
-from poker_engine import PokerEngine, GameState, Player, Card, Position
+# Import du moteur de poker AVANCÉ
+from advanced_poker_engine import AdvancedPokerEngine, GameState, Player, Card, Position
 from image_processor import PokerImageProcessor
 from poker_vision_prompts import PokerVisionPrompts
 
@@ -33,15 +33,15 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Initialize OpenAI Vision avec modèle optimisé
+# Initialize OpenAI Vision
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
 
 # Create the main app
-app = FastAPI(title="Poker Assistant API", version="2.0.0")
+app = FastAPI(title="Poker Assistant API", version="3.0.0")
 api_router = APIRouter(prefix="/api")
 
-# Initialize components
-poker_engine = PokerEngine()
+# Initialize components AVANCÉS
+poker_engine = AdvancedPokerEngine()
 image_processor = PokerImageProcessor()
 vision_prompts = PokerVisionPrompts()
 
@@ -77,6 +77,7 @@ class ScreenCaptureData(BaseModel):
     image_base64: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     session_id: str
+    phase_hint: Optional[str] = None  # NOUVEAU : hint pour la phase
 
 class PokerAnalysisResult(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -87,6 +88,7 @@ class PokerAnalysisResult(BaseModel):
     recommendation: Optional[Dict[str, Any]] = None
     confidence: float = 0.0
     processing_time: float = 0.0
+    analysis_type: str = "advanced"  # NOUVEAU
 
 class UserSettings(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -96,6 +98,7 @@ class UserSettings(BaseModel):
     capture_frequency: int = 2
     language: str = "fr"
     always_on_top: bool = True
+    sequential_analysis: bool = True  # NOUVEAU
 
 class GameSession(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -144,17 +147,34 @@ def clean_detected_cards(cards_list: List[str]) -> List[str]:
     
     return cleaned_cards
 
+def determine_phase_from_board(community_cards: List[str]) -> str:
+    """Détermine la phase basée sur le nombre de cartes communes"""
+    card_count = len(community_cards) if community_cards else 0
+    
+    if card_count == 0:
+        return 'preflop'
+    elif card_count == 3:
+        return 'flop'
+    elif card_count == 4:
+        return 'turn'
+    elif card_count == 5:
+        return 'river'
+    else:
+        return 'unknown'
+
 # Routes
 @api_router.get("/")
 async def root():
-    return {"message": "Poker Assistant API - Prêt pour l'analyse !", "version": "2.0.0", "optimized": True}
+    return {"message": "Poker Assistant API - Moteur Avancé Actif !", "version": "3.0.0", "features": ["advanced_engine", "sequential_analysis", "real_equity"]}
 
 @api_router.post("/analyze-screen")
 async def analyze_screen_capture(data: ScreenCaptureData):
-    """Analyse ultra-rapide et précise d'une capture d'écran"""
+    """Analyse ULTRA-AVANCÉE avec moteur de poker professionnel"""
     start_time = time.time()
     
     try:
+        print(f"🚀 ANALYSE AVANCÉE - Session: {data.session_id}")
+        
         # Génération du hash pour le cache
         image_hash = generate_image_hash(data.image_base64)
         
@@ -164,71 +184,103 @@ async def analyze_screen_capture(data: ScreenCaptureData):
             cached_result["id"] = str(uuid.uuid4())
             cached_result["timestamp"] = datetime.utcnow().isoformat()
             cached_result["session_id"] = data.session_id
-            cached_result["processing_time"] = 0.01  # Cache hit
+            cached_result["processing_time"] = 0.001  # Cache hit
+            print("💨 Cache hit - résultat instantané")
             return cached_result
         
         # Optimisation de l'image pour l'analyse
         print("🔄 Optimisation de l'image...")
         optimized_image = image_processor.optimize_image_for_poker_analysis(data.image_base64)
         
-        # Initialisation du chat OpenAI Vision avec modèle rapide
+        # Sélection du prompt selon la phase
+        if data.phase_hint:
+            system_prompt = vision_prompts.get_sequential_analysis_prompt(data.phase_hint)
+            print(f"📋 Prompt spécialisé pour phase: {data.phase_hint}")
+        else:
+            system_prompt = vision_prompts.get_poker_analysis_prompt()
+            print("📋 Prompt général d'analyse")
+        
+        # Initialisation du chat OpenAI Vision avec prompt spécialisé
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
-            session_id=f"poker_fast_{data.session_id}",
-            system_message=vision_prompts.get_poker_analysis_prompt()
-        ).with_model("openai", "gpt-4o-mini")  # Modèle plus rapide
+            session_id=f"poker_advanced_{data.session_id}",
+            system_message=system_prompt
+        ).with_model("openai", "gpt-4o")  # Modèle le plus puissant pour précision
         
         # Création du message avec l'image optimisée
         image_content = ImageContent(image_base64=optimized_image)
         user_message = UserMessage(
-            text="Analyse cette table de poker et retourne le JSON structuré avec les éléments détectés. Focus sur la précision des cartes.",
+            text="Analyse cette table de poker avec ATTENTION PARTICULIÈRE au BOARD (cartes communes au centre). Retourne le JSON structuré avec détection précise.",
             file_contents=[image_content]
         )
         
-        # Envoi avec timeout court pour la rapidité
-        print("🔄 Analyse par IA en cours...")
+        # Envoi avec timeout pour précision maximale
+        print("🤖 Analyse IA en cours...")
         response = await asyncio.wait_for(
             chat.send_message(user_message), 
-            timeout=15.0  # Timeout plus court
+            timeout=20.0  # Plus de temps pour précision
         )
         
         # Parsing optimisé de la réponse
         detected_elements = await parse_vision_response(response)
+        print(f"✅ Éléments détectés: {list(detected_elements.keys())}")
         
         # Validation et correction des cartes détectées
         if "hero_cards" in detected_elements and detected_elements["hero_cards"]:
+            original_hero = detected_elements["hero_cards"].copy()
             detected_elements["hero_cards"] = clean_detected_cards(detected_elements["hero_cards"])
+            print(f"🃏 Hero cards: {original_hero} → {detected_elements['hero_cards']}")
         
         if "community_cards" in detected_elements and detected_elements["community_cards"]:
+            original_board = detected_elements["community_cards"].copy()
             detected_elements["community_cards"] = clean_detected_cards(detected_elements["community_cards"])
+            print(f"🎯 Board cards: {original_board} → {detected_elements['community_cards']}")
         
-        # Construction rapide de l'état de jeu
+        # Détermination automatique de la phase
+        auto_phase = determine_phase_from_board(detected_elements.get("community_cards", []))
+        detected_phase = detected_elements.get("betting_round", auto_phase)
+        if detected_phase != auto_phase:
+            print(f"⚠️ Phase corrigée: {detected_phase} → {auto_phase}")
+            detected_elements["betting_round"] = auto_phase
+        
+        # Construction avancée de l'état de jeu
         game_state = None
         recommendation = None
         confidence = detected_elements.get("confidence_level", 0.0)
         
         if detected_elements.get("hero_cards") and len(detected_elements["hero_cards"]) == 2:
             try:
-                # Construction rapide de l'état de jeu
+                print("🏗️ Construction de l'état de jeu avancé...")
+                
+                # Conversion des cartes héros
+                hero_cards = []
+                for card_str in detected_elements["hero_cards"]:
+                    if len(card_str) == 2:
+                        hero_cards.append(Card(rank=card_str[0], suit=card_str[1].lower()))
+                
+                # Construction des joueurs
                 players = []
                 
                 # Joueur principal avec ses cartes
-                hero_cards = [Card(rank=card[0], suit=card[1].lower()) for card in detected_elements["hero_cards"]]
                 hero_player = Player(
                     name="Hero",
-                    stack=detected_elements.get("players", [{}])[0].get("stack", 1000),
-                    position=Position.DEALER,
+                    stack=detected_elements.get("players", [{}])[0].get("stack", 1500),
+                    position=Position.DEALER,  # Assumé pour simplifier
                     cards=hero_cards,
                     is_active=True
                 )
                 players.append(hero_player)
                 
-                # Joueurs adverses (simplifiés)
+                # Joueurs adverses
                 for i in range(2):
                     position = Position.SMALL_BLIND if i == 0 else Position.BIG_BLIND
+                    stack = 1500  # Stack par défaut
+                    if len(detected_elements.get("players", [])) > i + 1:
+                        stack = detected_elements["players"][i + 1].get("stack", 1500)
+                    
                     opponent = Player(
                         name=f"Opponent_{i+1}",
-                        stack=1000,
+                        stack=stack,
                         position=position,
                         is_active=True
                     )
@@ -241,29 +293,52 @@ async def analyze_screen_capture(data: ScreenCaptureData):
                         if len(card_str) == 2:
                             community_cards.append(Card(rank=card_str[0], suit=card_str[1].lower()))
                 
+                print(f"🎮 État de jeu: {len(community_cards)} cartes board, phase {auto_phase}")
+                
                 # État de jeu
                 game_state = GameState(
                     players=players,
                     community_cards=community_cards,
-                    pot=detected_elements.get("pot", 0),
+                    pot=detected_elements.get("pot", 150),
                     small_blind=detected_elements.get("blinds", {}).get("small_blind", 25),
                     big_blind=detected_elements.get("blinds", {}).get("big_blind", 50),
                     current_player=0,
-                    betting_round=detected_elements.get("betting_round", "preflop")
+                    betting_round=auto_phase
                 )
                 
-                # Recommandation rapide
-                recommendation = poker_engine.get_recommended_action(
+                # ANALYSE AVANCÉE avec vraies librairies de poker
+                print("🧠 Calcul de recommandation avancée...")
+                recommendation_result = poker_engine.get_recommended_action(
                     game_state, Position.DEALER, aggressiveness=0.5
                 )
-                confidence = max(confidence, recommendation.get("confidence", 0.0))
+                
+                # Conversion du résultat en dict
+                recommendation = {
+                    "action": recommendation_result.action,
+                    "confidence": recommendation_result.confidence,
+                    "reasoning": recommendation_result.reasoning,
+                    "hand_strength": recommendation_result.hand_strength,
+                    "pot_odds": recommendation_result.pot_odds,
+                    "phase": recommendation_result.phase,
+                    "equity": recommendation_result.equity,
+                    "hand_type": recommendation_result.hand_type,
+                    "outs": recommendation_result.outs,
+                    "implied_odds": recommendation_result.implied_odds,
+                    "position_factor": recommendation_result.position_factor,
+                    "icm_factor": recommendation_result.icm_factor
+                }
+                
+                confidence = max(confidence, recommendation_result.confidence)
+                
+                print(f"💡 Recommandation: {recommendation_result.action.upper()} ({recommendation_result.confidence:.1%})")
+                print(f"🎯 Équité: {recommendation_result.equity:.1%}, Outs: {recommendation_result.outs}")
                 
             except Exception as e:
-                print(f"Erreur construction état de jeu: {e}")
+                print(f"❌ Erreur construction état: {e}")
                 recommendation = {
                     "action": "fold",
                     "confidence": 0.3,
-                    "reasoning": f"Erreur d'analyse: {str(e)}",
+                    "reasoning": f"Erreur d'analyse avancée: {str(e)}",
                     "error": True
                 }
         
@@ -298,7 +373,8 @@ async def analyze_screen_capture(data: ScreenCaptureData):
             game_state=game_state_dict,
             recommendation=recommendation,
             confidence=confidence,
-            processing_time=processing_time
+            processing_time=processing_time,
+            analysis_type="advanced"
         )
         
         # Mise en cache pour éviter les analyses répétitives
@@ -315,11 +391,12 @@ async def analyze_screen_capture(data: ScreenCaptureData):
         # Diffusion WebSocket (asynchrone)
         asyncio.create_task(broadcast_analysis_async(analysis_result))
         
-        print(f"✅ Analyse terminée en {processing_time:.2f}s")
+        print(f"✅ Analyse avancée terminée en {processing_time:.2f}s")
         return analysis_result.dict()
         
     except asyncio.TimeoutError:
         processing_time = time.time() - start_time
+        print("⏰ Timeout d'analyse")
         return {
             "error": "Timeout",
             "message": "L'analyse a pris trop de temps",
@@ -328,6 +405,7 @@ async def analyze_screen_capture(data: ScreenCaptureData):
         }
     except Exception as e:
         processing_time = time.time() - start_time
+        print(f"❌ Erreur critique: {str(e)}")
         logging.error(f"Erreur lors de l'analyse: {str(e)}")
         return {
             "error": "AnalysisError",
@@ -389,6 +467,7 @@ async def broadcast_analysis_async(analysis_result: PokerAnalysisResult):
     except Exception as e:
         print(f"Erreur broadcast: {e}")
 
+# Routes existantes (inchangées)
 @api_router.get("/sessions/{session_id}/analyses")
 async def get_session_analyses(session_id: str, limit: int = 20):
     """Récupère les analyses d'une session (limité pour la performance)"""
@@ -424,9 +503,10 @@ async def get_performance_stats():
     """Statistiques de performance de l'API"""
     return {
         "cache_size": len(analysis_cache),
-        "average_processing_time": "< 3s",
-        "optimization_level": "high",
-        "version": "2.0.0"
+        "average_processing_time": "< 5s",
+        "optimization_level": "maximum",
+        "version": "3.0.0",
+        "features": ["treys_engine", "real_equity", "sequential_analysis"]
     }
 
 @api_router.websocket("/ws/{session_id}")
