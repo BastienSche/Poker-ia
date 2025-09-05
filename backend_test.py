@@ -66,49 +66,235 @@ class PokerAssistantTester:
         img_data = buffer.getvalue()
         return base64.b64encode(img_data).decode('utf-8')
 
-    def test_analyze_screen_endpoint(self):
-        """Test de l'endpoint d'analyse d'écran"""
+    def test_phase_detection_bug_fix(self):
+        """Test critique: Phase Detection Bug Fix - River doit retourner exactement 5 cartes"""
+        print("\n🔥 TEST CRITIQUE: Phase Detection Bug Fix")
+        
+        test_image_b64 = self.create_test_image()
+        
+        # Test 1: River phase doit retourner exactement 5 cartes
+        payload = {
+            "image_base64": test_image_b64,
+            "session_id": self.session_id,
+            "phase_hint": "river"
+        }
+        
         try:
-            # Création d'une image de test
-            test_image_b64 = self.create_test_image()
-            
-            payload = {
-                "image_base64": test_image_b64,
-                "session_id": self.session_id
-            }
-            
+            start_time = time.time()
             response = requests.post(
                 f"{self.api_url}/analyze-screen",
                 json=payload,
                 headers={'Content-Type': 'application/json'},
-                timeout=30  # Timeout plus long pour l'analyse IA
+                timeout=30
+            )
+            processing_time = time.time() - start_time
+            
+            if response.status_code == 200:
+                data = response.json()
+                detected_elements = data.get('detected_elements', {})
+                community_cards = detected_elements.get('community_cards', [])
+                betting_round = detected_elements.get('betting_round', '')
+                
+                # VALIDATION CRITIQUE: River doit avoir exactement 5 cartes
+                if len(community_cards) == 5 and betting_round == "river":
+                    self.log_test("Phase Detection - River Fix", True, 
+                                f"✅ RIVER: {len(community_cards)} cartes, phase={betting_round}, temps={processing_time:.3f}s")
+                    return True
+                else:
+                    self.log_test("Phase Detection - River Fix", False, 
+                                f"❌ RIVER: {len(community_cards)} cartes (attendu 5), phase={betting_round} (attendu river)")
+                    return False
+            else:
+                self.log_test("Phase Detection - River Fix", False, f"Status {response.status_code}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Phase Detection - River Fix", False, f"Exception: {str(e)}")
+            return False
+
+    def test_free_vision_engine_phases(self):
+        """Test du Free Vision Engine avec différents phase hints"""
+        print("\n🆓 TEST: Free Vision Engine - Toutes les phases")
+        
+        test_image_b64 = self.create_test_image()
+        phase_tests = [
+            ("preflop", 0),
+            ("flop", 3), 
+            ("turn", 4),
+            ("river", 5)
+        ]
+        
+        all_passed = True
+        
+        for phase_hint, expected_cards in phase_tests:
+            payload = {
+                "image_base64": test_image_b64,
+                "session_id": self.session_id,
+                "phase_hint": phase_hint
+            }
+            
+            try:
+                start_time = time.time()
+                response = requests.post(
+                    f"{self.api_url}/analyze-screen",
+                    json=payload,
+                    headers={'Content-Type': 'application/json'},
+                    timeout=30
+                )
+                processing_time = time.time() - start_time
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    detected_elements = data.get('detected_elements', {})
+                    community_cards = detected_elements.get('community_cards', [])
+                    betting_round = detected_elements.get('betting_round', '')
+                    analysis_type = data.get('analysis_type', '')
+                    
+                    # Validation du nombre de cartes et de la phase
+                    cards_correct = len(community_cards) == expected_cards
+                    phase_correct = betting_round == phase_hint
+                    is_free = analysis_type == "free_cv"
+                    is_fast = processing_time < 1.0
+                    
+                    if cards_correct and phase_correct and is_free:
+                        self.log_test(f"Free Vision - {phase_hint.upper()}", True, 
+                                    f"✅ {expected_cards} cartes, phase={betting_round}, type={analysis_type}, {processing_time:.3f}s")
+                    else:
+                        self.log_test(f"Free Vision - {phase_hint.upper()}", False, 
+                                    f"❌ {len(community_cards)}/{expected_cards} cartes, phase={betting_round}, type={analysis_type}")
+                        all_passed = False
+                else:
+                    self.log_test(f"Free Vision - {phase_hint.upper()}", False, f"Status {response.status_code}")
+                    all_passed = False
+                    
+            except Exception as e:
+                self.log_test(f"Free Vision - {phase_hint.upper()}", False, f"Exception: {str(e)}")
+                all_passed = False
+        
+        return all_passed
+
+    def test_performance_ultra_fast(self):
+        """Test de performance - Vérification temps de réponse ultra-rapide"""
+        print("\n⚡ TEST: Performance Ultra-Fast")
+        
+        test_image_b64 = self.create_test_image()
+        
+        # Test avec plusieurs phases pour vérifier la consistance
+        phases = ["preflop", "flop", "turn", "river"]
+        response_times = []
+        
+        for phase in phases:
+            payload = {
+                "image_base64": test_image_b64,
+                "session_id": self.session_id,
+                "phase_hint": phase
+            }
+            
+            try:
+                start_time = time.time()
+                response = requests.post(
+                    f"{self.api_url}/analyze-screen",
+                    json=payload,
+                    headers={'Content-Type': 'application/json'},
+                    timeout=30
+                )
+                processing_time = time.time() - start_time
+                response_times.append(processing_time)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    server_processing_time = data.get('processing_time', processing_time)
+                    
+                    # Vérification temps ultra-rapide (< 1 seconde)
+                    if processing_time < 1.0:
+                        print(f"   ✅ {phase}: {processing_time:.3f}s (serveur: {server_processing_time:.3f}s)")
+                    else:
+                        print(f"   ❌ {phase}: {processing_time:.3f}s - TROP LENT!")
+                        
+            except Exception as e:
+                print(f"   ❌ {phase}: Exception {str(e)}")
+                return False
+        
+        # Validation globale
+        avg_time = sum(response_times) / len(response_times) if response_times else 999
+        max_time = max(response_times) if response_times else 999
+        
+        if avg_time < 1.0 and max_time < 2.0:
+            self.log_test("Performance Ultra-Fast", True, 
+                        f"Temps moyen: {avg_time:.3f}s, Max: {max_time:.3f}s")
+            return True
+        else:
+            self.log_test("Performance Ultra-Fast", False, 
+                        f"TROP LENT - Temps moyen: {avg_time:.3f}s, Max: {max_time:.3f}s")
+            return False
+
+    def test_100_percent_free_status(self):
+        """Test du statut 100% gratuit"""
+        print("\n💰 TEST: 100% Free Status")
+        
+        # Test endpoint racine pour les messages gratuits
+        try:
+            response = requests.get(f"{self.api_url}/", timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                message = data.get("message", "")
+                features = data.get("features", [])
+                cost = data.get("cost", "")
+                
+                # Vérifications du statut gratuit
+                is_free_message = "GRATUIT" in message.upper() or "FREE" in message.upper()
+                has_free_features = any("free" in str(feature).lower() for feature in features)
+                has_zero_cost = "0.00" in cost or "gratuit" in cost.lower() or "free" in cost.lower()
+                
+                if is_free_message and has_free_features and has_zero_cost:
+                    self.log_test("100% Free Status - Root", True, 
+                                f"Message: {message}, Cost: {cost}")
+                else:
+                    self.log_test("100% Free Status - Root", False, 
+                                f"Pas assez de mentions gratuites - Message: {message}")
+                    
+        except Exception as e:
+            self.log_test("100% Free Status - Root", False, f"Exception: {str(e)}")
+            return False
+        
+        # Test analyse avec vérification du type gratuit
+        test_image_b64 = self.create_test_image()
+        payload = {
+            "image_base64": test_image_b64,
+            "session_id": self.session_id,
+            "phase_hint": "river"
+        }
+        
+        try:
+            response = requests.post(
+                f"{self.api_url}/analyze-screen",
+                json=payload,
+                headers={'Content-Type': 'application/json'},
+                timeout=30
             )
             
             if response.status_code == 200:
                 data = response.json()
-                required_fields = ['id', 'session_id', 'timestamp', 'detected_elements']
+                analysis_type = data.get('analysis_type', '')
+                detected_elements = data.get('detected_elements', {})
+                analysis_method = detected_elements.get('analysis_method', '')
                 
-                missing_fields = [field for field in required_fields if field not in data]
-                if missing_fields:
-                    self.log_test("Analyse d'écran", False, f"Champs manquants: {missing_fields}")
-                    return False
+                # Vérification que c'est bien gratuit
+                is_free_analysis = analysis_type == "free_cv"
+                is_free_method = "free" in analysis_method.lower()
                 
-                # Vérification de la structure des éléments détectés
-                detected = data.get('detected_elements', {})
-                if isinstance(detected, dict):
-                    self.log_test("Analyse d'écran", True, 
-                                f"Analyse réussie - Confiance: {data.get('confidence', 0):.2f}")
+                if is_free_analysis:
+                    self.log_test("100% Free Status - Analysis", True, 
+                                f"Type: {analysis_type}, Method: {analysis_method}")
                     return True
                 else:
-                    self.log_test("Analyse d'écran", False, "Structure detected_elements invalide")
+                    self.log_test("100% Free Status - Analysis", False, 
+                                f"Type non gratuit: {analysis_type}")
                     return False
-            else:
-                self.log_test("Analyse d'écran", False, 
-                            f"Status {response.status_code}: {response.text[:200]}")
-                return False
-                
+                    
         except Exception as e:
-            self.log_test("Analyse d'écran", False, f"Exception: {str(e)}")
+            self.log_test("100% Free Status - Analysis", False, f"Exception: {str(e)}")
             return False
 
     def test_settings_endpoints(self):
