@@ -1243,6 +1243,20 @@ function App() {
               </div>
               
               <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Mode séquentiel</span>
+                <input
+                  type="checkbox"
+                  checked={settings.sequentialMode}
+                  onChange={(e) => {
+                    const value = e.target.checked;
+                    setSettings({...settings, sequentialMode: value});
+                    addLog(`⚙️ Mode séquentiel: ${value ? 'ON' : 'OFF'}`, value ? 'success' : 'info');
+                  }}
+                  className="w-4 h-4"
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Debug logs</span>
                 <input
                   type="checkbox"
@@ -1254,6 +1268,13 @@ function App() {
                   }}
                   className="w-4 h-4"
                 />
+              </div>
+            </div>
+            
+            <div className="bg-slate-900/50 p-3 rounded-lg mt-4">
+              <div className="text-xs text-slate-400">
+                <strong>Mode Séquentiel:</strong> Guide phase par phase (preflop → flop → turn → river)<br/>
+                <strong>Debug Logs:</strong> Affiche tous les logs d'analyse en temps réel
               </div>
             </div>
             
