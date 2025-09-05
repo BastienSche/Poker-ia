@@ -259,9 +259,9 @@ class AdvancedPokerEngine:
 
     def calculate_pot_odds(self, pot_size: int, bet_to_call: int) -> float:
         """Calcule les pot odds"""
-        if bet_to_call <= 0:
-            return float('inf')
-        return pot_size / bet_to_call
+        if not pot_size or not bet_to_call or bet_to_call <= 0:
+            return 0.0
+        return max(0.0, pot_size / bet_to_call)
 
     def calculate_outs(self, hero_cards: List[Card], community_cards: List[Card]) -> int:
         """Estime le nombre d'outs approximatif"""
