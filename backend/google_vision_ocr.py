@@ -574,11 +574,15 @@ class GoogleVisionCardRecognizer:
         
         expected_board = {'preflop': 0, 'flop': 3, 'turn': 4, 'river': 5}.get(phase_hint, 0)
         
+        # GÉNÉRATION DE CARTES TEMPORAIRES pour affichage frontend
+        temp_hero_cards = self.generate_missing_cards([], 2)
+        temp_board_cards = self.generate_missing_cards(temp_hero_cards, expected_board) if expected_board > 0 else []
+        
         user_requests = [
             {
                 "type": "hero_cards",
                 "message": "L'analyse automatique a échoué. Quelles sont vos 2 cartes ? (format: AS KH)",
-                "detected": []
+                "detected": temp_hero_cards
             }
         ]
         
@@ -586,15 +590,15 @@ class GoogleVisionCardRecognizer:
             user_requests.append({
                 "type": "community_cards",
                 "message": f"Quelles sont les {expected_board} cartes du board pour la phase {phase_hint} ? (format: AS KH QD)",
-                "detected": [],
+                "detected": temp_board_cards,
                 "expected_count": expected_board
             })
         
         return {
             "blinds": {"small_blind": 25, "big_blind": 50, "ante": 0},
             "pot": 150,
-            "hero_cards": [],
-            "community_cards": [],
+            "hero_cards": temp_hero_cards,  # Cartes temporaires pour affichage
+            "community_cards": temp_board_cards,  # Cartes temporaires pour affichage
             "players": [{"position": "dealer", "name": "Hero", "stack": 1500, "current_bet": 0, "last_action": None, "is_active": True}],
             "betting_round": phase_hint or 'preflop',
             "confidence_level": 0.0,
@@ -604,7 +608,8 @@ class GoogleVisionCardRecognizer:
             "user_requests": user_requests,
             "needs_user_input": True,
             "error": error_msg,
-            "api_failure": True
+            "api_failure": True,
+            "display_note": "Cartes temporaires affichées - Veuillez saisir vos vraies cartes"
         }
             
     def preprocess_image_for_ocr(self, image_base64: str) -> str:
