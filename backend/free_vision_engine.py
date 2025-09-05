@@ -268,6 +268,8 @@ class FreePokerVision:
 
     def detect_pot_value(self, image: np.ndarray) -> int:
         """Détection basique de la valeur du pot"""
+        import random
+        
         try:
             # Extraction de la région du pot
             h, w = image.shape[:2]
