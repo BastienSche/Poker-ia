@@ -200,25 +200,25 @@ async def analyze_screen_capture(data: ScreenCaptureData):
             system_prompt = vision_prompts.get_poker_analysis_prompt()
             print("📋 Prompt général d'analyse")
         
-        # Initialisation du chat OpenAI Vision avec prompt spécialisé
+        # Initialisation du chat OpenAI Vision avec modèle ULTRA-RAPIDE
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
-            session_id=f"poker_advanced_{data.session_id}",
+            session_id=f"poker_speed_{data.session_id}",
             system_message=system_prompt
-        ).with_model("openai", "gpt-4o")  # Modèle le plus puissant pour précision
+        ).with_model("openai", "gpt-4o-mini")  # Modèle plus rapide
         
         # Création du message avec l'image optimisée
         image_content = ImageContent(image_base64=optimized_image)
         user_message = UserMessage(
-            text="Analyse cette table de poker avec ATTENTION PARTICULIÈRE au BOARD (cartes communes au centre). Retourne le JSON structuré avec détection précise.",
+            text=f"Analyse cette table de poker en mode {data.phase_hint or 'auto'}. Focus sur la détection précise du BOARD (cartes communes). Retourne le JSON structuré.",
             file_contents=[image_content]
         )
         
-        # Envoi avec timeout pour précision maximale
-        print("🤖 Analyse IA en cours...")
+        # Envoi avec timeout RÉDUIT pour vitesse maximale
+        print("⚡ Analyse IA ULTRA-RAPIDE...")
         response = await asyncio.wait_for(
             chat.send_message(user_message), 
-            timeout=20.0  # Plus de temps pour précision
+            timeout=10.0  # Timeout réduit pour plus de vitesse
         )
         
         # Parsing optimisé de la réponse
