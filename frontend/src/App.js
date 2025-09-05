@@ -39,7 +39,8 @@ function App() {
     autoAnalyze: true,
     captureFrequency: 2,
     alwaysOnTop: true,
-    showDebugLogs: true // Nouveaux logs debug
+    showDebugLogs: true,
+    sequentialMode: true // NOUVEAU : Mode séquentiel
   });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [analysisHistory, setAnalysisHistory] = useState([]);
@@ -51,6 +52,14 @@ function App() {
     avgProcessingTime: 0
   });
   const [lastAnalysisTime, setLastAnalysisTime] = useState(null);
+  
+  // NOUVEAU : États pour l'analyse séquentielle
+  const [currentPhase, setCurrentPhase] = useState('preflop');
+  const [phaseGuide, setPhaseGuide] = useState(null);
+  const [detectedCards, setDetectedCards] = useState({
+    hero: [],
+    board: []
+  });
   
   // NOUVEAU : Système de logs en temps réel
   const [debugLogs, setDebugLogs] = useState([]);
