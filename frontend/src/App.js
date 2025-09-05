@@ -36,11 +36,11 @@ function App() {
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const [settings, setSettings] = useState({
     aggressiveness: 0.5,
-    autoAnalyze: true,
+    autoAnalyze: false, // DÉSACTIVÉ par défaut pour éviter auto-analyse
     captureFrequency: 2,
     alwaysOnTop: true,
     showDebugLogs: true,
-    sequentialMode: true // NOUVEAU : Mode séquentiel
+    sequentialMode: true // Mode séquentiel
   });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [analysisHistory, setAnalysisHistory] = useState([]);
