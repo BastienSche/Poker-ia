@@ -517,7 +517,7 @@ class GoogleVisionCardRecognizer:
                     text_annotations = response_data.get('textAnnotations', [])
                     localized_objects = response_data.get('localizedObjectAnnotations', [])
                     
-                    # DIAGNOSTIC DÉTAILLÉ DES RÉSULTATS
+                    # DIAGNOSTIC DÉTAILLÉ DES RÉSULTATS AVEC COULEURS
                     print(f"🔍 ANALYSE DÉTAILLÉE GOOGLE VISION:")
                     print(f"   - Annotations texte: {len(text_annotations)}")
                     print(f"   - Objets localisés: {len(localized_objects)}")
@@ -529,8 +529,8 @@ class GoogleVisionCardRecognizer:
                         print("   • Resolution trop faible")
                         print("   • Pas de texte visible (cartes faces cachées?)")
                     else:
-                        # Log des premiers textes détectés
-                        print("📝 TEXTES DÉTECTÉS (premiers 10):")
+                        # Log des premiers textes détectés EN VERT
+                        print("\033[92m" + "📝 TEXTES GOOGLE VISION DÉTECTÉS (premiers 10):" + "\033[0m")
                         for i, ann in enumerate(text_annotations[:10]):
                             text = ann.get('description', '')
                             confidence = ann.get('confidence', 0)
@@ -538,14 +538,14 @@ class GoogleVisionCardRecognizer:
                             if vertices:
                                 x = sum(v.get('x', 0) for v in vertices) / len(vertices)
                                 y = sum(v.get('y', 0) for v in vertices) / len(vertices)
-                                print(f"   [{i}] '{text}' (conf: {confidence:.2f}) à ({x:.0f},{y:.0f})")
+                                print("\033[92m" + f"   [{i}] '{text}' (conf: {confidence:.2f}) à ({x:.0f},{y:.0f})" + "\033[0m")
                     
                     if len(localized_objects) > 0:
-                        print("🎯 OBJETS DÉTECTÉS:")
+                        print("\033[92m" + "🎯 OBJETS GOOGLE VISION DÉTECTÉS:" + "\033[0m")
                         for obj in localized_objects[:5]:
                             name = obj.get('name', 'Unknown')
                             confidence = obj.get('score', 0)
-                            print(f"   - {name} (conf: {confidence:.2f})")
+                            print("\033[92m" + f"   - {name} (conf: {confidence:.2f})" + "\033[0m")
                     
                     result = {
                         'full_text': '',
@@ -564,7 +564,7 @@ class GoogleVisionCardRecognizer:
                         result['full_text'] = text_annotations[0].get('description', '')
                         result['individual_texts'] = [ann.get('description', '') for ann in text_annotations[1:]]
                         result['text_annotations'] = text_annotations
-                        print(f"📖 TEXTE COMPLET: '{result['full_text'][:200]}...'")
+                        print("\033[92m" + f"📖 TEXTE COMPLET GOOGLE VISION: '{result['full_text'][:200]}...'" + "\033[0m")
                     
                     print(f"✅ SUCCÈS GOOGLE VISION API: {len(text_annotations)} textes, {len(localized_objects)} objets détectés")
                     
