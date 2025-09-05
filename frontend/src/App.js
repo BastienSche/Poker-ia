@@ -18,7 +18,9 @@ import {
   XCircle,
   Loader,
   Cpu,
-  Gauge
+  Gauge,
+  Terminal,
+  Info
 } from 'lucide-react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -37,8 +39,7 @@ function App() {
     autoAnalyze: true,
     captureFrequency: 2,
     alwaysOnTop: true,
-    useLocalAI: false, // Désactivé par défaut pour éviter les erreurs
-    continuousAnalysis: false
+    showDebugLogs: true // Nouveaux logs debug
   });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [analysisHistory, setAnalysisHistory] = useState([]);
@@ -51,40 +52,88 @@ function App() {
   });
   const [lastAnalysisTime, setLastAnalysisTime] = useState(null);
   
+  // NOUVEAU : Système de logs en temps réel
+  const [debugLogs, setDebugLogs] = useState([]);
+  const [currentStatus, setCurrentStatus] = useState('Prêt');
+  const [analysisStep, setAnalysisStep] = useState('');
+  
   // Refs
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const wsRef = useRef(null);
   const intervalRef = useRef(null);
 
-  // Connexion WebSocket
+  // NOUVEAU : Fonction pour ajouter des logs
+  const addLog = useCallback((message, type = 'info') => {
+    const timestamp = new Date().toLocaleTimeString();
+    const newLog = {
+      id: Date.now() + Math.random(),
+      timestamp,
+      message,
+      type // 'info', 'success', 'error', 'warning'
+    };
+    
+    console.log(`[${timestamp}] ${type.toUpperCase()}: ${message}`);
+    
+    setDebugLogs(prev => [newLog, ...prev.slice(0, 49)]); // Garde 50 logs max
+  }, []);
+
+  // NOUVEAU : Fonction pour mettre à jour le statut
+  const updateStatus = useCallback((status, step = '') => {
+    setCurrentStatus(status);
+    setAnalysisStep(step);
+    addLog(`Status: ${status}${step ? ` - ${step}` : ''}`, 'info');
+  }, [addLog]);
+
+  // Initialisation
+  useEffect(() => {
+    addLog('🚀 Assistant Poker Pro v2.1 initialisé', 'success');
+    addLog(`📡 Backend URL: ${BACKEND_URL}`, 'info');
+    addLog(`🔗 Session ID: ${sessionId}`, 'info');
+    updateStatus('Prêt', 'En attente de capture d\'écran');
+  }, [addLog, updateStatus, sessionId]);
+
+  // Connexion WebSocket avec logs
   useEffect(() => {
     const connectWebSocket = () => {
       try {
+        addLog('🔌 Tentative de connexion WebSocket...', 'info');
         wsRef.current = new WebSocket(`${WS_URL}/${sessionId}`);
         
         wsRef.current.onopen = () => {
           setConnectionStatus('connected');
-          console.log('✅ WebSocket connecté');
+          addLog('✅ WebSocket connecté avec succès', 'success');
+          updateStatus('Connecté', 'WebSocket actif');
         };
         
         wsRef.current.onmessage = (event) => {
-          const message = JSON.parse(event.data);
-          if (message.type === 'analysis_result') {
-            handleAnalysisResult(message.data);
+          addLog('📨 Message WebSocket reçu', 'info');
+          try {
+            const message = JSON.parse(event.data);
+            addLog(`📋 Type de message: ${message.type}`, 'info');
+            if (message.type === 'analysis_result') {
+              addLog('🎯 Résultat d\'analyse reçu via WebSocket', 'success');
+              handleAnalysisResult(message.data);
+            }
+          } catch (error) {
+            addLog(`❌ Erreur parsing WebSocket: ${error.message}`, 'error');
           }
         };
         
         wsRef.current.onclose = () => {
           setConnectionStatus('disconnected');
+          addLog('🔌 WebSocket déconnecté, reconnexion dans 3s...', 'warning');
+          updateStatus('Déconnecté', 'Reconnexion automatique');
           setTimeout(connectWebSocket, 3000);
         };
         
-        wsRef.current.onerror = () => {
+        wsRef.current.onerror = (error) => {
           setConnectionStatus('error');
+          addLog(`❌ Erreur WebSocket: ${error}`, 'error');
+          updateStatus('Erreur WebSocket');
         };
       } catch (error) {
-        console.error('Erreur WebSocket:', error);
+        addLog(`❌ Erreur connexion WebSocket: ${error.message}`, 'error');
         setConnectionStatus('error');
       }
     };
@@ -93,17 +142,39 @@ function App() {
     
     return () => {
       if (wsRef.current) {
+        addLog('🔌 Fermeture WebSocket', 'info');
         wsRef.current.close();
       }
     };
-  }, [sessionId]);
+  }, [sessionId, addLog, updateStatus]);
 
-  // Gestionnaire de résultats d'analyse - CORRECTION DU BUG
+  // Gestionnaire de résultats d'analyse avec logs détaillés
   const handleAnalysisResult = useCallback((analysisData) => {
+    addLog('📊 Traitement du résultat d\'analyse...', 'info');
+    
     setCurrentAnalysis(analysisData);
     setAnalysisHistory(prev => [analysisData, ...prev.slice(0, 19)]);
     
-    // Mise à jour correcte des statistiques
+    // Logs détaillés sur le résultat
+    if (analysisData.error) {
+      addLog(`❌ Erreur d'analyse: ${analysisData.message}`, 'error');
+    } else {
+      addLog(`✅ Analyse réussie en ${analysisData.processing_time?.toFixed(2)}s`, 'success');
+      
+      if (analysisData.detected_elements?.hero_cards) {
+        addLog(`🃏 Cartes détectées: ${analysisData.detected_elements.hero_cards.join(', ')}`, 'success');
+      }
+      
+      if (analysisData.detected_elements?.community_cards?.length > 0) {
+        addLog(`🎰 Board: ${analysisData.detected_elements.community_cards.join(', ')}`, 'success');
+      }
+      
+      if (analysisData.recommendation) {
+        addLog(`💡 Recommandation: ${analysisData.recommendation.action?.toUpperCase()} (${Math.round(analysisData.recommendation.confidence * 100)}%)`, 'success');
+      }
+    }
+    
+    // Mise à jour des statistiques avec logs
     setStats(prev => {
       const newCount = prev.handsAnalyzed + 1;
       const confidence = analysisData.confidence || 0;
@@ -117,6 +188,8 @@ function App() {
         ? processingTime
         : (prev.avgProcessingTime * prev.handsAnalyzed + processingTime) / newCount;
 
+      addLog(`📈 Stats mises à jour: ${newCount} analyses, ${Math.round(newAvgConfidence * 100)}% confiance moy.`, 'info');
+
       return {
         handsAnalyzed: newCount,
         avgConfidence: newAvgConfidence,
@@ -127,59 +200,100 @@ function App() {
     
     setIsAnalyzing(false);
     setLastAnalysisTime(new Date());
-  }, []);
+    updateStatus('Analyse terminée', `${analysisData.processing_time?.toFixed(2)}s`);
+  }, [addLog, updateStatus]);
 
-  // Fonction d'analyse cloud simplifiée
+  // Fonction d'analyse avec logs détaillés
   const analyzeScreen = useCallback(async () => {
-    if (!stream || !videoRef.current || !canvasRef.current || isAnalyzing) {
+    if (!stream || !videoRef.current || !canvasRef.current) {
+      addLog('❌ Conditions non remplies pour l\'analyse', 'error');
+      addLog(`Stream: ${!!stream}, Video: ${!!videoRef.current}, Canvas: ${!!canvasRef.current}`, 'error');
       return;
     }
 
+    if (isAnalyzing) {
+      addLog('⏳ Analyse déjà en cours, ignore la nouvelle demande', 'warning');
+      return;
+    }
+
+    addLog('🚀 DÉBUT DE L\'ANALYSE', 'info');
     setIsAnalyzing(true);
     setLastAnalysisTime(new Date());
+    updateStatus('Analyse en cours', 'Capture de l\'image...');
 
     const canvas = canvasRef.current;
     const video = videoRef.current;
-    const ctx = canvas.getContext('2d');
-    
-    // Optimisation : résolution réduite
-    const targetWidth = 1280;
-    const targetHeight = 720;
-    
-    canvas.width = targetWidth;
-    canvas.height = targetHeight;
-    ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
-    
-    // Conversion optimisée en base64
-    const imageData = canvas.toDataURL('image/jpeg', 0.75);
-    const base64Data = imageData.split(',')[1];
     
     try {
+      addLog('📷 Capture de l\'image vidéo...', 'info');
+      const ctx = canvas.getContext('2d');
+      
+      // Optimisation : résolution réduite
+      const targetWidth = 1280;
+      const targetHeight = 720;
+      
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
+      
+      addLog(`✅ Image capturée: ${targetWidth}x${targetHeight}`, 'success');
+      updateStatus('Analyse en cours', 'Conversion de l\'image...');
+      
+      // Conversion optimisée en base64
+      const imageData = canvas.toDataURL('image/jpeg', 0.75);
+      const base64Data = imageData.split(',')[1];
+      
+      addLog(`📦 Image convertie en base64: ${(base64Data.length / 1024).toFixed(1)}KB`, 'success');
+      updateStatus('Analyse en cours', 'Envoi à l\'API...');
+      
+      // Préparation de la requête
+      const requestData = {
+        image_base64: base64Data,
+        session_id: sessionId
+      };
+      
+      addLog(`📡 Envoi requête à: ${API}/analyze-screen`, 'info');
+      addLog(`🆔 Session ID: ${sessionId}`, 'info');
+      
+      const startTime = Date.now();
+      
       const response = await fetch(`${API}/analyze-screen`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          image_base64: base64Data,
-          session_id: sessionId
-        })
+        body: JSON.stringify(requestData)
       });
+      
+      const responseTime = Date.now() - startTime;
+      addLog(`📡 Réponse reçue en ${responseTime}ms`, 'info');
+      addLog(`📊 Status HTTP: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
+      
+      updateStatus('Analyse en cours', 'Traitement de la réponse...');
       
       if (response.ok) {
         const result = await response.json();
+        addLog('✅ Réponse JSON parsée avec succès', 'success');
+        addLog(`📋 Clés de réponse: ${Object.keys(result).join(', ')}`, 'info');
+        
         if (!result.error) {
+          addLog('🎯 Analyse réussie, traitement du résultat...', 'success');
           handleAnalysisResult(result);
         } else {
-          console.error('Erreur API:', result.message);
+          addLog(`❌ Erreur API: ${result.message}`, 'error');
           setIsAnalyzing(false);
+          updateStatus('Erreur', result.message);
         }
       } else {
-        throw new Error(`HTTP ${response.status}`);
+        const errorText = await response.text();
+        addLog(`❌ Erreur HTTP ${response.status}: ${errorText}`, 'error');
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
     } catch (error) {
-      console.error('Erreur analyse:', error);
+      addLog(`❌ ERREUR CRITIQUE: ${error.message}`, 'error');
+      addLog(`📍 Stack: ${error.stack}`, 'error');
       setIsAnalyzing(false);
+      updateStatus('Erreur critique', error.message);
       
       // Affichage d'erreur temporaire
       setCurrentAnalysis({
@@ -190,13 +304,17 @@ function App() {
       
       setTimeout(() => {
         setCurrentAnalysis(null);
-      }, 5000);
+        updateStatus('Prêt', 'Erreur résolue');
+      }, 10000);
     }
-  }, [stream, sessionId, isAnalyzing, handleAnalysisResult]);
+  }, [stream, sessionId, isAnalyzing, handleAnalysisResult, addLog, updateStatus]);
 
-  // Démarrage de la capture
+  // Démarrage de la capture avec logs
   const startCapture = async () => {
     try {
+      addLog('📺 Demande de capture d\'écran...', 'info');
+      updateStatus('Capture en cours', 'Demande de permissions...');
+      
       const mediaStream = await navigator.mediaDevices.getDisplayMedia({
         video: {
           mediaSource: 'screen',
@@ -207,55 +325,78 @@ function App() {
         audio: false
       });
       
+      addLog('✅ Permissions accordées, stream obtenu', 'success');
+      addLog(`📊 Stream: ${mediaStream.getVideoTracks().length} pistes vidéo`, 'info');
+      
       setStream(mediaStream);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        addLog('📹 Stream assigné à l\'élément vidéo', 'success');
       }
       
       setIsCapturing(true);
+      updateStatus('Capture active', 'Prêt pour analyse');
       
       // Capture automatique selon paramètres
       if (settings.autoAnalyze) {
-        const frequency = settings.continuousAnalysis ? 1000 : settings.captureFrequency * 1000;
+        const frequency = settings.captureFrequency * 1000;
+        addLog(`⏰ Analyse automatique activée: ${settings.captureFrequency}s`, 'info');
+        
         intervalRef.current = setInterval(() => {
           if (!isAnalyzing) {
+            addLog('🔄 Déclenchement analyse automatique', 'info');
             analyzeScreen();
+          } else {
+            addLog('⏳ Analyse en cours, skip intervalle', 'warning');
           }
         }, frequency);
       }
       
     } catch (error) {
-      console.error('Erreur capture:', error);
+      addLog(`❌ Erreur capture: ${error.message}`, 'error');
+      updateStatus('Erreur capture', error.message);
       alert('Impossible d\'accéder à la capture d\'écran. Vérifiez les autorisations.');
     }
   };
 
-  // Arrêt de la capture
+  // Arrêt de la capture avec logs
   const stopCapture = () => {
+    addLog('🛑 Arrêt de la capture...', 'info');
+    
     if (stream) {
-      stream.getTracks().forEach(track => track.stop());
+      stream.getTracks().forEach(track => {
+        track.stop();
+        addLog(`🔌 Piste ${track.kind} fermée`, 'info');
+      });
       setStream(null);
     }
+    
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
+      addLog('⏰ Intervalle automatique supprimé', 'info');
     }
+    
     setIsCapturing(false);
     setIsAnalyzing(false);
+    updateStatus('Prêt', 'Capture arrêtée');
+    addLog('✅ Capture arrêtée avec succès', 'success');
   };
 
-  // Nettoyage
+  // Nettoyage avec logs
   useEffect(() => {
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+        addLog('🧹 Nettoyage: intervalle supprimé', 'info');
       }
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
+        addLog('🧹 Nettoyage: stream fermé', 'info');
       }
     };
-  }, [stream]);
+  }, [stream, addLog]);
 
-  // Rendu optimisé de la recommandation
+  // Rendu optimisé de la recommandation (inchangé)
   const renderRecommendation = (recommendation) => {
     if (!recommendation) return null;
 
@@ -321,7 +462,7 @@ function App() {
     );
   };
 
-  // Rendu des cartes détectées
+  // Rendu des cartes détectées (inchangé)
   const renderDetectedCards = (cards, title) => {
     if (!cards || cards.length === 0) return null;
 
@@ -341,7 +482,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
-      {/* Header */}
+      {/* Header avec statut détaillé */}
       <div className="bg-slate-800/50 backdrop-blur border-b border-slate-700">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
@@ -352,17 +493,17 @@ function App() {
               <div>
                 <h1 className="text-xl font-bold">Assistant Poker Pro</h1>
                 <p className="text-sm text-slate-400">
-                  Analyse Ultra-Rapide • Texas Hold'em Spin & Go • v2.1
+                  Debug Mode • {currentStatus} {analysisStep && `• ${analysisStep}`}
                 </p>
               </div>
             </div>
             
             <div className="flex items-center gap-4">
-              {/* Indicateur d'analyse en cours */}
+              {/* Indicateur d'analyse détaillé */}
               {isAnalyzing && (
                 <div className="flex items-center gap-2 px-3 py-2 bg-blue-900/30 text-blue-300 rounded-lg">
                   <Loader className="w-4 h-4 animate-spin" />
-                  <span className="text-sm">Analyse...</span>
+                  <span className="text-sm">{analysisStep || 'Analyse...'}</span>
                 </div>
               )}
               
@@ -397,22 +538,25 @@ function App() {
           {/* Panel de capture principal */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Contrôles de capture */}
+            {/* Contrôles de capture avec debug */}
             <div className="bg-slate-800/50 backdrop-blur rounded-xl p-6 border border-slate-700">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <Eye className="w-5 h-5 text-blue-400" />
-                  <h2 className="text-lg font-semibold">Capture d'Écran Optimisée</h2>
+                  <h2 className="text-lg font-semibold">Capture Debug Mode</h2>
                   {lastAnalysisTime && (
                     <span className="text-xs text-slate-400">
-                      Dernière: {lastAnalysisTime.toLocaleTimeString()}
+                      {lastAnalysisTime.toLocaleTimeString()}
                     </span>
                   )}
                 </div>
                 <div className="flex gap-2">
                   {!isCapturing ? (
                     <button
-                      onClick={startCapture}
+                      onClick={() => {
+                        addLog('👆 Bouton "Démarrer" cliqué', 'info');
+                        startCapture();
+                      }}
                       className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors font-medium"
                       type="button"
                     >
@@ -422,7 +566,10 @@ function App() {
                   ) : (
                     <>
                       <button
-                        onClick={analyzeScreen}
+                        onClick={() => {
+                          addLog('👆 Bouton "Analyser" cliqué', 'info');
+                          analyzeScreen();
+                        }}
                         disabled={isAnalyzing}
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors font-medium ${
                           isAnalyzing 
@@ -435,7 +582,10 @@ function App() {
                         {isAnalyzing ? 'Analyse...' : 'Analyser'}
                       </button>
                       <button
-                        onClick={stopCapture}
+                        onClick={() => {
+                          addLog('👆 Bouton "Arrêter" cliqué', 'info');
+                          stopCapture();
+                        }}
                         className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors font-medium"
                         type="button"
                       >
@@ -445,6 +595,17 @@ function App() {
                     </>
                   )}
                 </div>
+              </div>
+              
+              {/* Statut en temps réel */}
+              <div className="mb-4 p-3 bg-slate-900/30 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <Info className="w-4 h-4 text-blue-400" />
+                  <span className="text-sm font-medium">Statut: {currentStatus}</span>
+                </div>
+                {analysisStep && (
+                  <div className="text-xs text-slate-400">➤ {analysisStep}</div>
+                )}
               </div>
               
               {/* Aperçu vidéo */}
@@ -460,8 +621,8 @@ function App() {
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-center">
                       <Monitor className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                      <p className="text-slate-400">Cliquez sur "Démarrer" pour capturer votre écran</p>
-                      <p className="text-xs text-slate-500 mt-2">Analyse optimisée &lt; 3s • Détection précise des cartes</p>
+                      <p className="text-slate-400">Mode Debug Activé</p>
+                      <p className="text-xs text-slate-500 mt-2">Tous les logs sont visibles en temps réel</p>
                     </div>
                   </div>
                 )}
@@ -469,7 +630,7 @@ function App() {
               </div>
             </div>
 
-            {/* Résultats de l'analyse */}
+            {/* Résultats de l'analyse (inchangé) */}
             {currentAnalysis && !currentAnalysis.error && (
               <div className="bg-slate-800/50 backdrop-blur rounded-xl p-6 border border-slate-700">
                 <div className="flex items-center gap-3 mb-4">
@@ -545,15 +706,47 @@ function App() {
                   <h3 className="text-lg font-semibold text-red-400">Erreur d'Analyse</h3>
                 </div>
                 <p className="text-red-300">{currentAnalysis.message}</p>
-                <p className="text-xs text-red-400 mt-2">
-                  Essayez de capturer une zone plus claire de la table de poker
-                </p>
               </div>
             )}
           </div>
 
-          {/* Panel latéral */}
+          {/* Panel latéral avec LOGS DEBUG */}
           <div className="space-y-6">
+            
+            {/* NOUVEAU: Console de logs en temps réel */}
+            <div className="bg-slate-800/50 backdrop-blur rounded-xl p-6 border border-slate-700">
+              <div className="flex items-center gap-3 mb-4">
+                <Terminal className="w-5 h-5 text-green-400" />
+                <h2 className="text-lg font-semibold">Console Debug</h2>
+                <button
+                  onClick={() => {
+                    setDebugLogs([]);
+                    addLog('🧹 Console nettoyée', 'info');
+                  }}
+                  className="text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded transition-colors"
+                  type="button"
+                >
+                  Clear
+                </button>
+              </div>
+              
+              <div className="bg-black/50 p-3 rounded-lg h-60 overflow-y-auto font-mono text-xs custom-scrollbar">
+                {debugLogs.length === 0 ? (
+                  <div className="text-slate-500">En attente de logs...</div>
+                ) : (
+                  debugLogs.map((log) => (
+                    <div key={log.id} className={`mb-1 ${
+                      log.type === 'error' ? 'text-red-400' :
+                      log.type === 'success' ? 'text-green-400' :
+                      log.type === 'warning' ? 'text-yellow-400' :
+                      'text-slate-300'
+                    }`}>
+                      <span className="text-slate-500">[{log.timestamp}]</span> {log.message}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
             
             {/* Statistiques de performance */}
             <div className="bg-slate-800/50 backdrop-blur rounded-xl p-6 border border-slate-700">
@@ -596,7 +789,7 @@ function App() {
                 <h2 className="text-lg font-semibold">Historique</h2>
               </div>
               
-              <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
+              <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
                 {analysisHistory.length === 0 ? (
                   <p className="text-slate-400 text-sm">Aucune analyse encore</p>
                 ) : (
@@ -632,14 +825,17 @@ function App() {
         </div>
       </div>
 
-      {/* Modal des paramètres simplifié */}
+      {/* Modal des paramètres avec debug */}
       {isSettingsOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-slate-800 rounded-xl p-6 max-w-md w-full mx-4 border border-slate-700">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold">Paramètres</h2>
+              <h2 className="text-xl font-semibold">Paramètres Debug</h2>
               <button
-                onClick={() => setIsSettingsOpen(false)}
+                onClick={() => {
+                  addLog('👆 Modal paramètres fermé', 'info');
+                  setIsSettingsOpen(false);
+                }}
                 className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
                 type="button"
               >
@@ -658,7 +854,11 @@ function App() {
                   max="1"
                   step="0.1"
                   value={settings.aggressiveness}
-                  onChange={(e) => setSettings({...settings, aggressiveness: parseFloat(e.target.value)})}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value);
+                    setSettings({...settings, aggressiveness: value});
+                    addLog(`⚙️ Agressivité changée: ${Math.round(value * 100)}%`, 'info');
+                  }}
                   className="w-full"
                 />
                 <div className="flex justify-between text-xs text-slate-400 mt-1">
@@ -676,7 +876,11 @@ function App() {
                   min="1"
                   max="10"
                   value={settings.captureFrequency}
-                  onChange={(e) => setSettings({...settings, captureFrequency: parseInt(e.target.value)})}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value);
+                    setSettings({...settings, captureFrequency: value});
+                    addLog(`⚙️ Fréquence changée: ${value}s`, 'info');
+                  }}
                   className="w-full"
                 />
                 <p className="text-xs text-slate-400 mt-1">Optimisé pour 2-3s</p>
@@ -687,17 +891,25 @@ function App() {
                 <input
                   type="checkbox"
                   checked={settings.autoAnalyze}
-                  onChange={(e) => setSettings({...settings, autoAnalyze: e.target.checked})}
+                  onChange={(e) => {
+                    const value = e.target.checked;
+                    setSettings({...settings, autoAnalyze: value});
+                    addLog(`⚙️ Analyse auto: ${value ? 'ON' : 'OFF'}`, 'info');
+                  }}
                   className="w-4 h-4"
                 />
               </div>
               
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Toujours au premier plan</span>
+                <span className="text-sm font-medium">Debug logs</span>
                 <input
                   type="checkbox"
-                  checked={settings.alwaysOnTop}
-                  onChange={(e) => setSettings({...settings, alwaysOnTop: e.target.checked})}
+                  checked={settings.showDebugLogs}
+                  onChange={(e) => {
+                    const value = e.target.checked;
+                    setSettings({...settings, showDebugLogs: value});
+                    addLog(`⚙️ Debug logs: ${value ? 'ON' : 'OFF'}`, value ? 'success' : 'warning');
+                  }}
                   className="w-4 h-4"
                 />
               </div>
@@ -706,6 +918,7 @@ function App() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => {
+                  addLog('💾 Paramètres sauvegardés', 'success');
                   setIsSettingsOpen(false);
                   // Redémarrage avec nouveaux paramètres
                   if (isCapturing && intervalRef.current) {
@@ -713,6 +926,7 @@ function App() {
                     if (settings.autoAnalyze) {
                       intervalRef.current = setInterval(() => {
                         if (!isAnalyzing) {
+                          addLog('🔄 Auto-analyse déclenchée', 'info');
                           analyzeScreen();
                         }
                       }, settings.captureFrequency * 1000);
@@ -725,7 +939,10 @@ function App() {
                 Sauvegarder
               </button>
               <button
-                onClick={() => setIsSettingsOpen(false)}
+                onClick={() => {
+                  addLog('❌ Paramètres annulés', 'warning');
+                  setIsSettingsOpen(false);
+                }}
                 className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
                 type="button"
               >
