@@ -189,10 +189,10 @@ async def analyze_screen_capture(data: ScreenCaptureData):
         print("🔄 Optimisation gratuite de l'image...")
         optimized_image = image_processor.optimize_image_for_poker_analysis(data.image_base64)
         
-        # *** ANALYSE 100% GRATUITE AVEC COMPUTER VISION LOCALE ***
-        print("🆓 Analyse par computer vision gratuite...")
-        detected_elements = google_vision_ocr.analyze_poker_image_free(
-            optimized_image, 
+        # *** ANALYSE AVEC GOOGLE VISION API ***
+        print(f"🔍 Analyse Google Vision API pour phase: {data.phase_hint or 'auto'}")
+        detected_elements = google_vision_ocr.analyze_poker_image_vision(
+            data.image_base64, 
             data.phase_hint
         )
         
