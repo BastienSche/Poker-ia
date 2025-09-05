@@ -427,7 +427,7 @@ class AdvancedPokerEngine:
     def make_decision(self, hand_string: str, equity: float, pot_odds: float, outs: int,
                      phase: str, position_factor: float, icm_factor: float, 
                      aggressiveness: float, bet_to_call: int, stack: int) -> Tuple[str, float, str]:
-        """Logique de décision avancée"""
+        """Logique de décision avancée avec focus preflop amélioré"""
         
         try:
             reasons = []
@@ -440,7 +440,12 @@ class AdvancedPokerEngine:
             stack = stack if stack is not None else 1000
             aggressiveness = max(0.0, min(1.0, aggressiveness if aggressiveness is not None else 0.5))
             
-            # Décision basée sur l'équité et les pot odds
+            # LOGIQUE SPÉCIALE PREFLOP - Plus claire et précise
+            if phase == 'early' or not phase or phase == 'preflop':  # Preflop
+                return self.make_preflop_decision(hand_string, equity, position_factor, 
+                                                aggressiveness, bet_to_call, stack)
+            
+            # Décision basée sur l'équité et les pot odds pour post-flop
             if bet_to_call == 0:  # Pas de mise à suivre
                 if equity >= 0.6:
                     action = 'raise'
@@ -511,6 +516,87 @@ class AdvancedPokerEngine:
         except Exception as e:
             print(f"Erreur make_decision: {e}")
             return 'fold', 0.3, f'Erreur décision: {str(e)}'
+    
+    def make_preflop_decision(self, hand_string: str, equity: float, position_factor: float,
+                             aggressiveness: float, bet_to_call: int, stack: int) -> Tuple[str, float, str]:
+        """Décision PREFLOP spécialisée et claire"""
+        
+        print(f"🃏 PREFLOP: Analysing {hand_string} (equity: {equity:.1%})")
+        
+        # Classification des mains preflop
+        premium_hands = ['AA', 'KK', 'QQ', 'JJ', 'AKs', 'AKo']
+        strong_hands = ['TT', '99', '88', 'AQs', 'AQo', 'AJs', 'AJo', 'KQs', 'KQo']
+        playable_hands = ['77', '66', '55', '44', '33', '22', 'ATs', 'A9s', 'A8s', 'KJs', 'KTs', 'QJs', 'JTs']
+        
+        reasons = []
+        
+        # Décision basée sur la classification de main
+        if hand_string in premium_hands:
+            if bet_to_call == 0:
+                action = 'raise'
+                confidence = 0.95
+                reasons.append(f"Main PREMIUM {hand_string} - RELANCER obligatoire")
+            elif bet_to_call <= stack * 0.1:  # Petite relance
+                action = 'raise'
+                confidence = 0.90
+                reasons.append(f"Main PREMIUM {hand_string} - SURRELANCER")
+            else:  # Grosse relance
+                action = 'call'
+                confidence = 0.85
+                reasons.append(f"Main PREMIUM {hand_string} - SUIVRE la grosse mise")
+                
+        elif hand_string in strong_hands:
+            if bet_to_call == 0:
+                action = 'raise'
+                confidence = 0.80
+                reasons.append(f"Main FORTE {hand_string} - RELANCER pour value")
+            elif bet_to_call <= stack * 0.05:  # Très petite relance
+                action = 'call'
+                confidence = 0.75
+                reasons.append(f"Main FORTE {hand_string} - SUIVRE")
+            else:
+                action = 'fold'
+                confidence = 0.70
+                reasons.append(f"Main FORTE {hand_string} - SE COUCHER face à grosse relance")
+                
+        elif hand_string in playable_hands:
+            if bet_to_call == 0:
+                if position_factor >= 1.1:  # Bonne position
+                    action = 'call'
+                    confidence = 0.65
+                    reasons.append(f"Main JOUABLE {hand_string} - SUIVRE en bonne position")
+                else:
+                    action = 'fold'
+                    confidence = 0.60
+                    reasons.append(f"Main JOUABLE {hand_string} - SE COUCHER en mauvaise position")
+            else:
+                action = 'fold'
+                confidence = 0.80
+                reasons.append(f"Main JOUABLE {hand_string} - SE COUCHER face à relance")
+                
+        else:  # Main faible
+            action = 'fold'
+            confidence = 0.90
+            reasons.append(f"Main FAIBLE {hand_string} - SE COUCHER immédiatement")
+        
+        # Ajustements d'agressivité preflop
+        if aggressiveness > 0.7:
+            if action == 'call' and hand_string in strong_hands:
+                action = 'raise'
+                reasons.append("Style AGRESSIF - Transformer call en raise")
+            elif action == 'fold' and hand_string in playable_hands and bet_to_call == 0:
+                action = 'call'
+                reasons.append("Style AGRESSIF - Élargir le range")
+                
+        elif aggressiveness < 0.3:
+            if action == 'raise' and hand_string in strong_hands:
+                action = 'call'
+                reasons.append("Style CONSERVATEUR - Limiter l'agression")
+        
+        reasoning = " | ".join(reasons)
+        print(f"🎯 PREFLOP DECISION: {action.upper()} ({confidence:.0%}) - {reasoning}")
+        
+        return action, confidence, reasoning
 
     def get_position_factor(self, position: Position, phase: str) -> float:
         """Facteur de position selon la phase"""
