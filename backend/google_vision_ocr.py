@@ -226,45 +226,54 @@ class GoogleVisionCardRecognizer:
         }
     
     def preprocess_poker_table_image(self, image_base64: str) -> str:
-        """Prétraitement spécialisé pour images de tables de poker"""
+        """Prétraitement LÉGER spécialisé pour images de tables de poker - Préserve les détails"""
         try:
-            print("🎯 Préprocessing spécialisé pour table de poker...")
+            print("🎯 === PREPROCESSING LÉGER POUR POKER ===")
             
             # Décoder l'image
             image_data = base64.b64decode(image_base64)
             image = Image.open(io.BytesIO(image_data))
             
+            print(f"📊 Image originale: {image.size[0]}x{image.size[1]} pixels")
+            
             # Convertir en RGB si nécessaire
             if image.mode != 'RGB':
                 image = image.convert('RGB')
+                print("🔄 Converti en RGB")
             
-            # Optimisations spéciales pour tables de poker
+            # PREPROCESSING TRÈS LÉGER pour préserver les détails
             
-            # 1. Amélioration du contraste pour mieux voir les cartes
+            # 1. Amélioration LÉGÈRE du contraste pour cartes
             enhancer = ImageEnhance.Contrast(image)
-            image = enhancer.enhance(1.8)  # Contraste plus élevé
+            image = enhancer.enhance(1.2)  # Très léger
+            print("✨ Contraste amélioré légèrement")
             
-            # 2. Amélioration de la netteté pour les textes de cartes
+            # 2. Amélioration LÉGÈRE de la netteté pour texte des cartes
             sharpness = ImageEnhance.Sharpness(image)
-            image = sharpness.enhance(2.0)  # Netteté maximale
+            image = sharpness.enhance(1.1)  # Très léger
+            print("🔍 Netteté améliorée légèrement")
             
-            # 3. Amélioration de la luminosité pour les tables sombres
-            brightness = ImageEnhance.Brightness(image)
-            image = brightness.enhance(1.2)
+            # 3. PAS d'amélioration de luminosité pour éviter de brûler les détails
+            # brightness = ImageEnhance.Brightness(image)
+            # image = brightness.enhance(1.1)  # DÉSACTIVÉ
             
-            # 4. Détection et amélioration des zones de cartes
-            image = self.enhance_card_regions(image)
+            # 4. Pas de détection de zones spéciales - garde l'image intacte
             
-            # Reconvertir en base64
+            # Sauvegarder en PNG haute qualité (pas JPEG qui compresse)
             buffer = io.BytesIO()
-            image.save(buffer, format='PNG', optimize=True, quality=95)
+            image.save(buffer, format='PNG', optimize=False, compress_level=1)  # Compression minimale
             optimized_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
             
-            print("✅ Préprocessing poker terminé")
+            size_original = len(image_base64) * 3 / 4 / 1024  # KB
+            size_processed = len(optimized_b64) * 3 / 4 / 1024  # KB
+            
+            print(f"📏 Tailles: Original {size_original:.1f}KB → Traité {size_processed:.1f}KB")
+            print("✅ Preprocessing léger terminé - Détails préservés")
+            
             return optimized_b64
             
         except Exception as e:
-            print(f"⚠️ Erreur préprocessing, utilisation image originale: {e}")
+            print(f"⚠️ Erreur preprocessing (utilisation original): {e}")
             return image_base64
     
     def enhance_card_regions(self, image: Image.Image) -> Image.Image:
