@@ -728,7 +728,7 @@ function App() {
               <div>
                 <h1 className="text-xl font-bold">Assistant Poker Pro</h1>
                 <p className="text-sm text-slate-400">
-                  Debug Mode • {currentStatus} {analysisStep && `• ${analysisStep}`}
+                  🆓 100% GRATUIT • Computer Vision Locale • v4.0 • {currentStatus} {analysisStep && `• ${analysisStep}`}
                 </p>
               </div>
             </div>
