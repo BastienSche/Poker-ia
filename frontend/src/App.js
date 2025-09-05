@@ -72,6 +72,8 @@ function App() {
   const [showCardInput, setShowCardInput] = useState(false);
   const [selectedHeroCards, setSelectedHeroCards] = useState([]);
   const [selectedBoardCards, setSelectedBoardCards] = useState([]);
+  const [inputHeroCards, setInputHeroCards] = useState('');
+  const [inputBoardCards, setInputBoardCards] = useState('');
   const [userRequests, setUserRequests] = useState([]);
   const [isCompletingAnalysis, setIsCompletingAnalysis] = useState(false);
   const [cardSelectionStep, setCardSelectionStep] = useState('hero'); // 'hero' ou 'board'
