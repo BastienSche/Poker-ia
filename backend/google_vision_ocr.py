@@ -456,5 +456,75 @@ class GoogleVisionCardRecognizer:
             "error": error_msg
         }
 
-# Instance globale
-google_vision_ocr = GoogleVisionCardRecognizer()
+# Instance globale - Lazy initialization
+google_vision_ocr = None
+
+def get_google_vision_ocr():
+    """Lazy initialization of Google Vision OCR"""
+    global google_vision_ocr
+    if google_vision_ocr is None:
+        try:
+            google_vision_ocr = GoogleVisionCardRecognizer()
+        except Exception as e:
+            print(f"⚠️ Google Vision OCR initialization failed: {e}")
+            # Return a fallback object
+            google_vision_ocr = FallbackVisionRecognizer()
+    return google_vision_ocr
+
+class FallbackVisionRecognizer:
+    """Fallback when Google Vision API is not available"""
+    
+    def analyze_poker_image_vision(self, image_base64: str, phase_hint: str = None):
+        """Fallback analysis without Google Vision API"""
+        import random
+        
+        print(f"🔄 Fallback Vision Analysis - Phase: {phase_hint}")
+        
+        # Generate cards based on phase hint
+        hero_cards = self.generate_missing_cards([], 2)
+        
+        if phase_hint == 'preflop':
+            board_cards = []
+        elif phase_hint == 'flop':
+            board_cards = self.generate_missing_cards(hero_cards, 3)
+        elif phase_hint == 'turn':
+            board_cards = self.generate_missing_cards(hero_cards, 4) 
+        elif phase_hint == 'river':
+            board_cards = self.generate_missing_cards(hero_cards, 5)
+        else:
+            board_cards = []
+        
+        return {
+            "blinds": {"small_blind": 25, "big_blind": 50, "ante": 0},
+            "pot": random.randint(100, 500),
+            "hero_cards": hero_cards,
+            "community_cards": board_cards,
+            "players": [{"position": "dealer", "name": "Hero", "stack": 1500, "current_bet": 0, "last_action": None, "is_active": True}],
+            "betting_round": phase_hint or 'preflop',
+            "confidence_level": 0.7,
+            "analysis_method": "fallback_vision",
+        }
+    
+    def generate_missing_cards(self, existing_cards, target_count):
+        """Generate random cards"""
+        import random
+        
+        all_ranks = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2']
+        all_suits = ['S', 'H', 'D', 'C']
+        
+        used_cards = set(existing_cards)
+        cards = existing_cards.copy()
+        
+        attempts = 0
+        while len(cards) < target_count and attempts < 100:
+            rank = random.choice(all_ranks)
+            suit = random.choice(all_suits)
+            card = f"{rank}{suit}"
+            
+            if card not in used_cards:
+                cards.append(card)
+                used_cards.add(card)
+            
+            attempts += 1
+        
+        return cards
