@@ -219,6 +219,80 @@ function App() {
     updateStatus('Analyse terminée', `${analysisData.processing_time?.toFixed(2)}s`);
   }, [addLog, updateStatus]);
 
+  // NOUVEAU : Fonction pour compléter l'analyse avec saisie utilisateur
+  const completeAnalysisWithUserInput = useCallback(async () => {
+    if (isCompletingAnalysis) return;
+    
+    setIsCompletingAnalysis(true);
+    addLog('🙋 Complétion analyse avec saisie utilisateur...', 'info');
+    
+    try {
+      // Parser les cartes saisies
+      const heroCards = inputHeroCards.trim().toUpperCase().split(/\s+/).filter(c => c.length >= 2);
+      const boardCards = inputBoardCards.trim().toUpperCase().split(/\s+/).filter(c => c.length >= 2);
+      
+      addLog(`👤 Cartes saisies: Héros=${heroCards.join(' ')}, Board=${boardCards.join(' ')}`, 'info');
+      
+      const response = await fetch(`${API}/complete-analysis`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: sessionId,
+          phase_hint: currentPhase,
+          hero_cards: heroCards,
+          community_cards: boardCards,
+          pot: 150
+        })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        addLog('✅ Analyse complétée avec données utilisateur !', 'success');
+        
+        // Mettre à jour l'analyse actuelle
+        setCurrentAnalysis(result);
+        
+        // Mettre à jour les cartes détectées
+        setDetectedCards({
+          hero: result.detected_elements?.hero_cards || heroCards,
+          board: result.detected_elements?.community_cards || boardCards
+        });
+        
+        // Masquer l'interface de saisie
+        setShowCardInput(false);
+        setInputHeroCards('');
+        setInputBoardCards('');
+        
+        // Mettre à jour les stats
+        if (result.recommendation) {
+          const rec = result.recommendation;
+          addLog(`💡 RECOMMANDATION: ${rec.action?.toUpperCase()} (${Math.round(rec.confidence * 100)}%)`, 'success');
+          addLog(`🧠 Raisonnement: ${rec.reasoning}`, 'info');
+        }
+        
+        // Historique
+        setAnalysisHistory(prev => [result, ...prev.slice(0, 9)]);
+        
+        // Stats
+        setStats(prev => ({
+          handsAnalyzed: prev.handsAnalyzed + 1,
+          avgConfidence: ((prev.avgConfidence * prev.handsAnalyzed + (result.confidence || 0)) / (prev.handsAnalyzed + 1)),
+          lastUpdateTime: new Date(),
+          avgProcessingTime: prev.avgProcessingTime
+        }));
+        
+      } else {
+        const error = await response.json();
+        addLog(`❌ Erreur complétion: ${error.message}`, 'error');
+      }
+      
+    } catch (error) {
+      addLog(`❌ Erreur complétion: ${error.message}`, 'error');
+    } finally {
+      setIsCompletingAnalysis(false);
+    }
+  }, [isCompletingAnalysis, inputHeroCards, inputBoardCards, currentPhase, sessionId, addLog]);
+
   // NOUVELLE : Fonction d'analyse avec détection de phase
   const analyzeScreenWithPhase = useCallback(async (phaseHint = null) => {
     if (!stream || !videoRef.current || !canvasRef.current) {
