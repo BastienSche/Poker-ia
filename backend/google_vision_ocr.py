@@ -300,7 +300,9 @@ class GoogleVisionCardRecognizer:
     def call_vision_api_optimized(self, image_base64: str) -> Dict[str, Any]:
         """Appel optimisé à Google Vision API pour reconnaissance de poker"""
         try:
-            print("📡 Appel Google Vision API optimisé pour poker...")
+            print("📡 === APPEL GOOGLE VISION API ===")
+            print(f"🔑 Utilisation clé: ***{self.api_key[-4:]}")
+            print(f"🌐 URL: {self.api_url}")
             
             # Configuration spécialisée pour tables de poker
             request_data = {
@@ -335,7 +337,7 @@ class GoogleVisionCardRecognizer:
             
             url_with_key = f"{self.api_url}?key={self.api_key}"
             
-            print(f"🔑 Utilisation clé API: ***{self.api_key[-4:]}")
+            print("🚀 Envoi requête à Google Vision API...")
             
             response = requests.post(
                 url_with_key,
@@ -344,7 +346,7 @@ class GoogleVisionCardRecognizer:
                 timeout=15  # Timeout plus long pour traitement complexe
             )
             
-            print(f"📊 Réponse API: Status {response.status_code}")
+            print(f"📊 RÉPONSE GOOGLE API: Status {response.status_code}")
             
             if response.status_code == 200:
                 data = response.json()
@@ -353,7 +355,9 @@ class GoogleVisionCardRecognizer:
                     response_data = data['responses'][0]
                     
                     if 'error' in response_data:
-                        raise Exception(f"Vision API Error: {response_data['error']}")
+                        error_detail = response_data['error']
+                        print(f"❌ ERREUR GOOGLE VISION API: {error_detail}")
+                        raise Exception(f"Vision API Error: {error_detail}")
                     
                     # Extraire textes ET objets
                     text_annotations = response_data.get('textAnnotations', [])
@@ -372,18 +376,53 @@ class GoogleVisionCardRecognizer:
                         result['individual_texts'] = [ann.get('description', '') for ann in text_annotations[1:]]
                         result['text_annotations'] = text_annotations
                     
-                    print(f"✅ Vision API: {len(text_annotations)} textes, {len(localized_objects)} objets détectés")
+                    print(f"✅ SUCCÈS GOOGLE VISION API: {len(text_annotations)} textes, {len(localized_objects)} objets détectés")
+                    print(f"📝 Texte détecté: '{result['full_text'][:100]}...'")
+                    
                     return result
                 else:
+                    print("❌ ERREUR: Pas de réponse dans les données API")
                     raise Exception("Pas de réponse dans les données API")
+                    
+            elif response.status_code == 403:
+                error_text = response.text
+                print(f"❌ ERREUR 403 - FACTURATION: {error_text}")
+                
+                if "billing" in error_text.lower():
+                    raise Exception("ERREUR FACTURATION - Google Vision API nécessite un compte avec facturation activée")
+                elif "quota" in error_text.lower():
+                    raise Exception("ERREUR QUOTA - Limite Google Vision API atteinte")
+                else:
+                    raise Exception(f"ERREUR PERMISSIONS - Google Vision API: {error_text}")
+                    
+            elif response.status_code == 400:
+                error_text = response.text
+                print(f"❌ ERREUR 400 - DONNÉES INVALIDES: {error_text}")
+                
+                if "image" in error_text.lower():
+                    raise Exception("ERREUR IMAGE - Format d'image invalide pour Google Vision API")
+                else:
+                    raise Exception(f"ERREUR DONNÉES - Google Vision API: {error_text}")
                     
             else:
                 error_detail = response.text
-                print(f"❌ Erreur API {response.status_code}: {error_detail}")
+                print(f"❌ ERREUR HTTP {response.status_code}: {error_detail}")
                 raise Exception(f"Erreur API HTTP {response.status_code}: {error_detail}")
                 
+        except requests.exceptions.Timeout:
+            print("❌ TIMEOUT - Google Vision API ne répond pas")
+            raise Exception("TIMEOUT - Google Vision API ne répond pas dans les 15 secondes")
+            
+        except requests.exceptions.ConnectionError:
+            print("❌ ERREUR CONNEXION - Impossible de contacter Google Vision API")
+            raise Exception("ERREUR CONNEXION - Vérifiez votre connexion internet")
+            
+        except requests.exceptions.RequestException as e:
+            print(f"❌ ERREUR REQUÊTE: {e}")
+            raise Exception(f"Erreur requête Google Vision API: {str(e)}")
+            
         except Exception as e:
-            print(f"❌ Erreur appel Vision API: {e}")
+            print(f"❌ ERREUR GOOGLE VISION API: {e}")
             raise e
     
     def analyze_poker_table_layout(self, ocr_results: Dict[str, Any], phase_hint: str) -> Dict[str, Any]:
