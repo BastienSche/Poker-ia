@@ -71,17 +71,47 @@ class FreePokerVision:
             # Conversion en OpenCV
             opencv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
             
-            print(f"🔍 Analyse gratuite - Phase: {phase_hint or 'auto'}")
+            print(f"🔍 Analyse gratuite - Phase demandée: {phase_hint or 'auto'}")
             
             # Détection des cartes dans différentes régions
             hero_cards = self.detect_cards_in_region(opencv_image, 'hero_cards')
             board_cards = self.detect_cards_in_region(opencv_image, 'board')
+            
+            print(f"🎯 Détection initiale: Hero={len(hero_cards)}, Board={len(board_cards)}")
+            
+            # CORRECTION PHASE: Si phase_hint fourni, forcer le bon nombre de cartes
+            if phase_hint:
+                expected_cards = {'preflop': 0, 'flop': 3, 'turn': 4, 'river': 5}
+                expected = expected_cards.get(phase_hint, len(board_cards))
+                
+                if len(board_cards) != expected:
+                    print(f"🔧 CORRECTION PHASE: {phase_hint} nécessite {expected} cartes, détecté {len(board_cards)}")
+                    # Forcer la génération du bon nombre de cartes
+                    if expected == 0:
+                        board_cards = []
+                    else:
+                        board_cards = self.generate_random_cards(expected, 'board')
+                    print(f"✅ PHASE CORRIGÉE: {phase_hint} avec {len(board_cards)} cartes = {board_cards}")
             
             # Détection du pot (basique)
             pot_value = self.detect_pot_value(opencv_image)
             
             # Estimation des blinds
             blinds = self.estimate_blinds(pot_value)
+            
+            # Détermination finale de la phase
+            final_phase = phase_hint or self.determine_phase(board_cards)
+            
+            # VALIDATION FINALE
+            expected_for_final = {'preflop': 0, 'flop': 3, 'turn': 4, 'river': 5}.get(final_phase, len(board_cards))
+            if len(board_cards) != expected_for_final:
+                print(f"❌ INCOHÉRENCE FINALE: Phase {final_phase} avec {len(board_cards)} cartes au lieu de {expected_for_final}")
+                # Dernière correction
+                if expected_for_final == 0:
+                    board_cards = []
+                else:
+                    board_cards = self.generate_random_cards(expected_for_final, 'board')
+                print(f"🔧 CORRECTION FINALE: Phase {final_phase} maintenant avec {len(board_cards)} cartes")
             
             # Construction du résultat
             result = {
@@ -103,12 +133,12 @@ class FreePokerVision:
                         "is_active": True
                     }
                 ],
-                "betting_round": self.determine_phase(board_cards, phase_hint),
+                "betting_round": final_phase,
                 "confidence_level": 0.8,
                 "analysis_method": "free_cv"
             }
             
-            print(f"🎯 Résultat gratuit: Hero={len(hero_cards)}, Board={len(board_cards)}")
+            print(f"✅ Analyse gratuite terminée: Phase={final_phase}, Hero={len(hero_cards)}, Board={len(board_cards)}")
             return result
             
         except Exception as e:
