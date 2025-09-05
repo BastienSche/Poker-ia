@@ -212,8 +212,8 @@ function App() {
     updateStatus('Analyse terminée', `${analysisData.processing_time?.toFixed(2)}s`);
   }, [addLog, updateStatus]);
 
-  // Fonction d'analyse avec logs détaillés
-  const analyzeScreen = useCallback(async () => {
+  // NOUVELLE : Fonction d'analyse avec détection de phase
+  const analyzeScreenWithPhase = useCallback(async (phaseHint = null) => {
     if (!stream || !videoRef.current || !canvasRef.current) {
       addLog('❌ Conditions non remplies pour l\'analyse', 'error');
       addLog(`Stream: ${!!stream}, Video: ${!!videoRef.current}, Canvas: ${!!canvasRef.current}`, 'error');
@@ -225,44 +225,45 @@ function App() {
       return;
     }
 
-    addLog('🚀 DÉBUT DE L\'ANALYSE', 'info');
+    const phase = phaseHint || currentPhase;
+    addLog(`🚀 ANALYSE ${phase.toUpperCase()} EN COURS`, 'info');
     setIsAnalyzing(true);
     setLastAnalysisTime(new Date());
-    updateStatus('Analyse en cours', 'Capture de l\'image...');
+    updateStatus(`Analyse ${phase}`, 'Capture de l\'image...');
 
     const canvas = canvasRef.current;
     const video = videoRef.current;
     
     try {
-      addLog('📷 Capture de l\'image vidéo...', 'info');
+      addLog(`📷 Capture pour phase ${phase}...`, 'info');
       const ctx = canvas.getContext('2d');
       
-      // Optimisation : résolution réduite
-      const targetWidth = 1280;
-      const targetHeight = 720;
+      // Optimisation : résolution adaptée à la phase
+      const targetWidth = phase === 'preflop' ? 1280 : 1600; // Plus haute résolution pour le board
+      const targetHeight = phase === 'preflop' ? 720 : 900;
       
       canvas.width = targetWidth;
       canvas.height = targetHeight;
       ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
       
-      addLog(`✅ Image capturée: ${targetWidth}x${targetHeight}`, 'success');
-      updateStatus('Analyse en cours', 'Conversion de l\'image...');
+      addLog(`✅ Image capturée: ${targetWidth}x${targetHeight} pour ${phase}`, 'success');
+      updateStatus(`Analyse ${phase}`, 'Conversion de l\'image...');
       
       // Conversion optimisée en base64
-      const imageData = canvas.toDataURL('image/jpeg', 0.75);
+      const imageData = canvas.toDataURL('image/jpeg', 0.85); // Qualité plus haute pour board
       const base64Data = imageData.split(',')[1];
       
-      addLog(`📦 Image convertie en base64: ${(base64Data.length / 1024).toFixed(1)}KB`, 'success');
-      updateStatus('Analyse en cours', 'Envoi à l\'API...');
+      addLog(`📦 Image convertie: ${(base64Data.length / 1024).toFixed(1)}KB`, 'success');
+      updateStatus(`Analyse ${phase}`, `Envoi à l\'API avec focus ${phase}...`);
       
-      // Préparation de la requête
+      // Préparation de la requête avec hint de phase
       const requestData = {
         image_base64: base64Data,
-        session_id: sessionId
+        session_id: sessionId,
+        phase_hint: phase // NOUVEAU : Hint pour l'analyse spécialisée
       };
       
-      addLog(`📡 Envoi requête à: ${API}/analyze-screen`, 'info');
-      addLog(`🆔 Session ID: ${sessionId}`, 'info');
+      addLog(`📡 Envoi requête avec phase_hint: ${phase}`, 'info');
       
       const startTime = Date.now();
       
@@ -278,15 +279,49 @@ function App() {
       addLog(`📡 Réponse reçue en ${responseTime}ms`, 'info');
       addLog(`📊 Status HTTP: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
       
-      updateStatus('Analyse en cours', 'Traitement de la réponse...');
+      updateStatus(`Analyse ${phase}`, 'Traitement de la réponse...');
       
       if (response.ok) {
         const result = await response.json();
         addLog('✅ Réponse JSON parsée avec succès', 'success');
-        addLog(`📋 Clés de réponse: ${Object.keys(result).join(', ')}`, 'info');
+        
+        // Log spécifique selon la phase
+        if (result.detected_elements) {
+          const heroCards = result.detected_elements.hero_cards || [];
+          const boardCards = result.detected_elements.community_cards || [];
+          
+          addLog(`🃏 Cartes héros détectées: ${heroCards.length ? heroCards.join(', ') : 'Aucune'}`, heroCards.length ? 'success' : 'warning');
+          addLog(`🎯 Board détecté: ${boardCards.length ? boardCards.join(', ') : 'Aucun'}`, boardCards.length || phase === 'preflop' ? 'success' : 'warning');
+          
+          // Mise à jour des cartes détectées
+          setDetectedCards({
+            hero: heroCards,
+            board: boardCards
+          });
+          
+          // Validation de la phase
+          const detectedPhase = result.detected_elements.betting_round;
+          if (detectedPhase && detectedPhase !== phase) {
+            addLog(`🔄 Phase détectée différente: ${phase} → ${detectedPhase}`, 'info');
+            setCurrentPhase(detectedPhase);
+          }
+        }
         
         if (!result.error) {
-          addLog('🎯 Analyse réussie, traitement du résultat...', 'success');
+          addLog(`🎯 Analyse ${phase} réussie !`, 'success');
+          
+          // Log de la recommandation
+          if (result.recommendation) {
+            const rec = result.recommendation;
+            addLog(`💡 RECOMMANDATION: ${rec.action?.toUpperCase()} (${Math.round(rec.confidence * 100)}%)`, 'success');
+            if (rec.equity) {
+              addLog(`⚡ Équité: ${Math.round(rec.equity * 100)}% | Type: ${rec.hand_type || 'N/A'}`, 'info');
+            }
+            if (rec.outs > 0) {
+              addLog(`🎲 Outs: ${rec.outs} | Pot odds: ${rec.pot_odds?.toFixed(1)}:1`, 'info');
+            }
+          }
+          
           handleAnalysisResult(result);
         } else {
           addLog(`❌ Erreur API: ${result.message}`, 'error');
@@ -299,15 +334,14 @@ function App() {
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
     } catch (error) {
-      addLog(`❌ ERREUR CRITIQUE: ${error.message}`, 'error');
-      addLog(`📍 Stack: ${error.stack}`, 'error');
+      addLog(`❌ ERREUR ${phase.toUpperCase()}: ${error.message}`, 'error');
       setIsAnalyzing(false);
       updateStatus('Erreur critique', error.message);
       
       // Affichage d'erreur temporaire
       setCurrentAnalysis({
         error: true,
-        message: `Erreur: ${error.message}`,
+        message: `Erreur analyse ${phase}: ${error.message}`,
         timestamp: new Date().toISOString()
       });
       
@@ -316,7 +350,12 @@ function App() {
         updateStatus('Prêt', 'Erreur résolue');
       }, 10000);
     }
-  }, [stream, sessionId, isAnalyzing, handleAnalysisResult, addLog, updateStatus]);
+  }, [stream, sessionId, isAnalyzing, currentPhase, handleAnalysisResult, addLog, updateStatus]);
+
+  // Fonction d'analyse standard (fallback)
+  const analyzeScreen = useCallback(() => {
+    return analyzeScreenWithPhase();
+  }, [analyzeScreenWithPhase]);
 
   // Démarrage de la capture avec logs
   const startCapture = async () => {
