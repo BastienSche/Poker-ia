@@ -333,72 +333,96 @@ class AdvancedPokerEngine:
                              aggressiveness: float = 0.5) -> AnalysisResult:
         """Analyse avancée avec vraies librairies de poker"""
         
-        # Trouver le héros
-        hero = None
-        for player in game_state.players:
-            if player.position == hero_position:
-                hero = player
-                break
-        
-        if not hero or not hero.cards or len(hero.cards) != 2:
+        try:
+            # Trouver le héros
+            hero = None
+            for player in game_state.players:
+                if player.position == hero_position:
+                    hero = player
+                    break
+            
+            if not hero or not hero.cards or len(hero.cards) != 2:
+                return AnalysisResult(
+                    action='fold',
+                    confidence=0.1,
+                    reasoning='Cartes du héros non disponibles',
+                    hand_strength=0.0,
+                    pot_odds=0.0,
+                    phase='unknown',
+                    equity=0.0,
+                    hand_type='unknown',
+                    outs=0,
+                    implied_odds=0.0,
+                    position_factor=0.0,
+                    icm_factor=0.0
+                )
+            
+            # Calculs avancés avec protection contre None
+            phase = self.determine_game_phase(game_state)
+            hand_string = self.get_hand_string(hero.cards)
+            equity = self.calculate_hand_equity(hero.cards, game_state.community_cards or [])
+            outs = self.calculate_outs(hero.cards, game_state.community_cards or [])
+            
+            # Calcul sécurisé des pot odds
+            active_players = [p for p in game_state.players if p.is_active and p.current_bet is not None]
+            max_bet = max((p.current_bet for p in active_players), default=0)
+            hero_bet = hero.current_bet if hero.current_bet is not None else 0
+            bet_to_call = max(0, max_bet - hero_bet)
+            pot_size = game_state.pot if game_state.pot is not None else 0
+            pot_odds = self.calculate_pot_odds(pot_size, bet_to_call) if bet_to_call > 0 else 0
+            
+            # Facteurs de position
+            position_factor = self.get_position_factor(hero_position, phase)
+            
+            # Facteurs ICM
+            icm_factor = self.icm_adjustments.get(phase, 1.0)
+            
+            # Odds implicites (simplifiées)
+            implied_odds = pot_odds * 1.5 if pot_odds > 0 else 0
+            
+            # Protection contre les stacks None
+            hero_stack = hero.stack if hero.stack is not None else 1000
+            
+            # Logique de décision améliorée
+            action, confidence, reasoning = self.make_decision(
+                hand_string, equity, pot_odds, outs, phase, position_factor, 
+                icm_factor, aggressiveness, bet_to_call, hero_stack
+            )
+            
+            # Classification de la main
+            hand_type = self.classify_hand_type(hero.cards, game_state.community_cards or [])
+            
+            return AnalysisResult(
+                action=action,
+                confidence=confidence,
+                reasoning=reasoning,
+                hand_strength=equity,
+                pot_odds=pot_odds,
+                phase=phase,
+                equity=equity,
+                hand_type=hand_type,
+                outs=outs,
+                implied_odds=implied_odds,
+                position_factor=position_factor,
+                icm_factor=icm_factor
+            )
+            
+        except Exception as e:
+            print(f"Erreur get_recommended_action: {e}")
             return AnalysisResult(
                 action='fold',
                 confidence=0.1,
-                reasoning='Cartes du héros non disponibles',
+                reasoning=f'Erreur interne: {str(e)}',
                 hand_strength=0.0,
                 pot_odds=0.0,
                 phase='unknown',
                 equity=0.0,
-                hand_type='unknown',
+                hand_type='error',
                 outs=0,
                 implied_odds=0.0,
                 position_factor=0.0,
                 icm_factor=0.0
             )
-        
-        # Calculs avancés
-        phase = self.determine_game_phase(game_state)
-        hand_string = self.get_hand_string(hero.cards)
-        equity = self.calculate_hand_equity(hero.cards, game_state.community_cards)
-        outs = self.calculate_outs(hero.cards, game_state.community_cards)
-        
-        # Calcul des pot odds
-        max_bet = max((p.current_bet for p in game_state.players if p.is_active), default=0)
-        bet_to_call = max(0, max_bet - hero.current_bet)
-        pot_odds = self.calculate_pot_odds(game_state.pot, bet_to_call) if bet_to_call > 0 else 0
-        
-        # Facteurs de position
-        position_factor = self.get_position_factor(hero_position, phase)
-        
-        # Facteurs ICM
-        icm_factor = self.icm_adjustments.get(phase, 1.0)
-        
-        # Odds implicites (simplifiées)
-        implied_odds = pot_odds * 1.5 if pot_odds > 0 else 0
-        
-        # Logique de décision améliorée
-        action, confidence, reasoning = self.make_decision(
-            hand_string, equity, pot_odds, outs, phase, position_factor, 
-            icm_factor, aggressiveness, bet_to_call, hero.stack
-        )
-        
-        # Classification de la main
-        hand_type = self.classify_hand_type(hero.cards, game_state.community_cards)
-        
-        return AnalysisResult(
-            action=action,
-            confidence=confidence,
-            reasoning=reasoning,
-            hand_strength=equity,
-            pot_odds=pot_odds,
-            phase=phase,
-            equity=equity,
-            hand_type=hand_type,
-            outs=outs,
-            implied_odds=implied_odds,
-            position_factor=position_factor,
-            icm_factor=icm_factor
-        )
 
     def make_decision(self, hand_string: str, equity: float, pot_odds: float, outs: int,
                      phase: str, position_factor: float, icm_factor: float, 
