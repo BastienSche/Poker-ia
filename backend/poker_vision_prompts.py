@@ -146,20 +146,33 @@ PHASE = "turn" si exactement 4 cartes communes
 """,
             
             'river': """
-ANALYSE RIVER SPÉCIALISÉE :
+ANALYSE RIVER CRITIQUE :
 
-Focus sur :
-1. 🎯 BOARD : exactement 5 cartes au centre
-2. 🃏 Cartes personnelles finales
-3. 💰 Pot final
-4. 🎲 Actions river/showdown
+⚠️ MISSION SPÉCIALE RIVER ⚠️
+Tu DOIS détecter exactement 5 cartes communes au centre !
 
-BOARD COMPLET :
-- 5 cartes communes (flop + turn + river)
-- Board complet = main finale
-- Toutes les cartes visibles
+FOCUS ABSOLU sur :
+1. 🎯 BOARD : EXACTEMENT 5 cartes au centre de la table
+2. 🃏 Cartes personnelles (2 cartes)
+3. 💰 Pot final après toutes les mises
+4. 🏁 Situation de showdown
 
-PHASE = "river" si exactement 5 cartes communes
+ATTENTION RIVER - RÈGLES STRICTES :
+- Le BOARD doit avoir EXACTEMENT 5 cartes
+- Les 5 cartes sont disposées horizontalement au centre
+- C'est la phase finale : flop (3) + turn (1) + river (1) = 5 cartes
+- Si tu vois moins de 5 cartes, CHERCHE PLUS ATTENTIVEMENT !
+- Les cartes peuvent être légèrement espacées ou superposées
+
+PHASE = "river" OBLIGATOIRE si tu détectes cette analyse
+COMMUNITY_CARDS doit contenir exactement 5 cartes valides
+
+EXEMPLE RIVER VALIDE :
+"community_cards": ["AS", "KH", "QD", "JC", "TS"]
+"betting_round": "river"
+
+❌ SI MOINS DE 5 CARTES DÉTECTÉES ❌
+Regarde encore plus attentivement la zone centrale !
 """
         }
         
