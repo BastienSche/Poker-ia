@@ -172,12 +172,12 @@ async def analyze_screen_capture(data: ScreenCaptureData):
     try:
         print(f"🆓 ANALYSE GRATUITE - Session: {data.session_id} - Phase: {data.phase_hint or 'auto'}")
         
-        # Génération du hash pour le cache
-        image_hash = generate_image_hash(data.image_base64)
+        # Génération du hash pour le cache INCLUANT LA PHASE
+        cache_key = f"{generate_image_hash(data.image_base64)}_{data.phase_hint or 'auto'}"
         
         # Vérification du cache (évite les analyses répétitives)
-        if image_hash in analysis_cache:
-            cached_result = analysis_cache[image_hash]
+        if cache_key in analysis_cache:
+            cached_result = analysis_cache[cache_key]
             cached_result["id"] = str(uuid.uuid4())
             cached_result["timestamp"] = datetime.utcnow().isoformat()
             cached_result["session_id"] = data.session_id
@@ -356,7 +356,7 @@ async def analyze_screen_capture(data: ScreenCaptureData):
         )
         
         # Mise en cache
-        analysis_cache[image_hash] = analysis_result.dict()
+        analysis_cache[cache_key] = analysis_result.dict()
         
         # Nettoyage du cache
         if len(analysis_cache) > 10:
