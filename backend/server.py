@@ -20,7 +20,7 @@ import time
 # Import du moteur de poker AVANCÉ
 from advanced_poker_engine import AdvancedPokerEngine, GameState, Player, Card, Position
 from image_processor import PokerImageProcessor
-from google_vision_ocr import google_vision_ocr
+from google_vision_ocr import get_google_vision_ocr
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -191,6 +191,7 @@ async def analyze_screen_capture(data: ScreenCaptureData):
         
         # *** ANALYSE AVEC GOOGLE VISION API ***
         print(f"🔍 Analyse Google Vision API pour phase: {data.phase_hint or 'auto'}")
+        google_vision_ocr = get_google_vision_ocr()
         detected_elements = google_vision_ocr.analyze_poker_image_vision(
             data.image_base64, 
             data.phase_hint
