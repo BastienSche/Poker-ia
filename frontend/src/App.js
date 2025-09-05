@@ -391,15 +391,51 @@ function App() {
         if (!result.error) {
           addLog(`🎯 Analyse ${phase} réussie !`, 'success');
           
-          // Log de la recommandation
-          if (result.recommendation) {
-            const rec = result.recommendation;
-            addLog(`💡 RECOMMANDATION: ${rec.action?.toUpperCase()} (${Math.round(rec.confidence * 100)}%)`, 'success');
-            if (rec.equity) {
-              addLog(`⚡ Équité: ${Math.round(rec.equity * 100)}% | Type: ${rec.hand_type || 'N/A'}`, 'info');
+          // NOUVEAU : Vérifier si saisie utilisateur nécessaire
+          if (result.recommendation && result.recommendation.action === 'input_required') {
+            addLog('🙋 SAISIE UTILISATEUR REQUISE - Informations manquantes détectées', 'warning');
+            
+            // Extraire les demandes utilisateur
+            const requests = result.recommendation.user_requests || [];
+            setUserRequests(requests);
+            
+            // Logger les détections partielles
+            const partialDetection = result.recommendation.partial_detection || {};
+            addLog(`🤖 Détection partielle: Héros ${partialDetection.hero_cards_found || 0}/2, Board ${partialDetection.board_cards_found || 0}`, 'info');
+            
+            // Afficher l'interface de saisie
+            setShowCardInput(true);
+            
+            // Pré-remplir avec les cartes détectées
+            const detectedHero = result.detected_elements?.hero_cards || [];
+            const detectedBoard = result.detected_elements?.community_cards || [];
+            
+            if (detectedHero.length > 0) {
+              setInputHeroCards(detectedHero.join(' '));
+              addLog(`🃏 Cartes héros pré-remplies: ${detectedHero.join(' ')}`, 'info');
             }
-            if (rec.outs > 0) {
-              addLog(`🎲 Outs: ${rec.outs} | Pot odds: ${rec.pot_odds?.toFixed(1)}:1`, 'info');
+            
+            if (detectedBoard.length > 0) {
+              setInputBoardCards(detectedBoard.join(' '));
+              addLog(`🎯 Cartes board pré-remplies: ${detectedBoard.join(' ')}`, 'info');
+            }
+            
+            // Logger les demandes spécifiques
+            requests.forEach(req => {
+              addLog(`📝 ${req.message}`, 'warning');
+            });
+            
+          } else {
+            // Analyse normale complète
+            if (result.recommendation) {
+              const rec = result.recommendation;
+              addLog(`💡 RECOMMANDATION: ${rec.action?.toUpperCase()} (${Math.round(rec.confidence * 100)}%)`, 'success');
+              if (rec.equity) {
+                addLog(`⚡ Équité: ${Math.round(rec.equity * 100)}% | Type: ${rec.hand_type || 'N/A'}`, 'info');
+              }
+              if (rec.outs > 0) {
+                addLog(`🎯 Outs: ${rec.outs} cartes améliorantes`, 'info');
+              }
             }
           }
           
