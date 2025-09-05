@@ -81,9 +81,9 @@ class GoogleVisionCardRecognizer:
         
     def analyze_poker_image_vision(self, image_base64: str, phase_hint: str = None) -> Dict[str, Any]:
         """
-        Analyse RÉELLE d'une image de poker avec Google Vision API - AUCUN FALLBACK ALÉATOIRE
+        Analyse RÉELLE d'une image de poker avec Google Vision API + IA générative
         """
-        print(f"🔍 APPEL RÉEL Google Vision API - Phase: {phase_hint or 'auto'}")
+        print(f"🔍 === ANALYSE GOOGLE VISION + IA === Phase: {phase_hint or 'auto'}")
         
         try:
             # ÉTAPE 1: Préprocessing spécialisé pour tables de poker
@@ -94,19 +94,39 @@ class GoogleVisionCardRecognizer:
             print("📡 APPEL RÉEL GOOGLE VISION API...")
             ocr_results = self.call_vision_api_optimized(optimized_image_b64)
             
-            print(f"📊 OCR Results: {len(ocr_results.get('individual_texts', []))} textes détectés")
-            print(f"📝 Texte complet: '{ocr_results.get('full_text', '')[:100]}...'")
+            # ÉTAPE 3: INTERPRÉTATION IA GÉNÉRATIVE
+            print("🤖 INTERPRÉTATION IA GÉNÉRATIVE...")
             
-            # ÉTAPE 3: Analyse spécialisée des résultats RÉELS
-            hero_cards = self.detect_hero_cards(ocr_results.get('text_annotations', []), ocr_results.get('full_text', ''))
-            board_cards = self.detect_community_cards(ocr_results.get('text_annotations', []), ocr_results.get('full_text', ''), phase_hint)
-            pot_info = self.detect_pot_and_bets(ocr_results.get('text_annotations', []), ocr_results.get('full_text', ''))
+            # Préparer les données pour l'IA
+            full_text = ocr_results.get('full_text', '')
+            text_annotations = ocr_results.get('text_annotations', [])
             
-            print(f"🃏 DETECTION RÉELLE: Hero={len(hero_cards)} cartes, Board={len(board_cards)} cartes")
-            print(f"🎯 Cartes hero détectées: {hero_cards}")
-            print(f"🎯 Cartes board détectées: {board_cards}")
+            # Extraire informations de position pour l'IA
+            position_info = []
+            for ann in text_annotations[1:20]:  # Prendre les 20 premiers
+                text = ann.get('description', '')
+                vertices = ann.get('boundingPoly', {}).get('vertices', [])
+                if vertices and len(vertices) >= 2:
+                    avg_x = sum(v.get('x', 0) for v in vertices) / len(vertices)
+                    avg_y = sum(v.get('y', 0) for v in vertices) / len(vertices)
+                    position_info.append({
+                        'text': text,
+                        'x': avg_x,
+                        'y': avg_y
+                    })
             
-            # ÉTAPE 4: Validation et demande utilisateur si nécessaire
+            # Appel asynchrone à l'IA (dans le contexte sync)
+            ai_result = asyncio.run(self.interpret_with_ai(full_text, phase_hint, position_info))
+            
+            # ÉTAPE 4: Validation et construction du résultat final
+            hero_cards = ai_result.get('hero_cards', [])
+            board_cards = ai_result.get('community_cards', [])
+            ai_confidence = ai_result.get('confidence', 0.0)
+            
+            print(f"🤖 IA RESULT: Hero={len(hero_cards)} {hero_cards}, Board={len(board_cards)} {board_cards}")
+            print(f"🎯 Confiance IA: {ai_confidence:.1%}")
+            
+            # Validation de la phase
             expected_board = {'preflop': 0, 'flop': 3, 'turn': 4, 'river': 5}.get(phase_hint, 0)
             
             user_requests = []
@@ -117,9 +137,10 @@ class GoogleVisionCardRecognizer:
                 needs_input = True
                 user_requests.append({
                     "type": "hero_cards",
-                    "message": f"🤖 API détecté {len(hero_cards)} cartes héros. Quelles sont vos 2 cartes exactes ?",
+                    "message": f"🤖 IA détecté {len(hero_cards)} cartes héros sur 2. Corriger ?",
                     "detected": hero_cards,
-                    "format": "Exemple: AS KH"
+                    "format": "Exemple: AS KH",
+                    "ai_confidence": ai_confidence
                 })
             
             # Vérifier cartes board
@@ -127,43 +148,78 @@ class GoogleVisionCardRecognizer:
                 needs_input = True
                 user_requests.append({
                     "type": "community_cards",
-                    "message": f"🤖 API détecté {len(board_cards)}/{expected_board} cartes board. Quelles sont les {expected_board} cartes exactes ?",
+                    "message": f"🤖 IA détecté {len(board_cards)}/{expected_board} cartes board. Corriger ?",
                     "detected": board_cards,
                     "expected_count": expected_board,
-                    "format": "Exemple: AS KH QD"
+                    "format": "Exemple: AS KH QD",
+                    "ai_confidence": ai_confidence
                 })
             
-            # Calculer confiance basée sur détections réelles
-            confidence = self.calculate_real_confidence(hero_cards, board_cards, expected_board, ocr_results)
+            # Calculer confiance globale (Vision API + IA)
+            vision_confidence = len(text_annotations) / 50  # Normalized by expected text count
+            global_confidence = (vision_confidence * 0.3 + ai_confidence * 0.7)  # IA a plus de poids
             
             result = {
                 "blinds": {"small_blind": 25, "big_blind": 50, "ante": 0},
-                "pot": pot_info.get("pot", 150),
+                "pot": self.estimate_pot_from_text(full_text),
                 "hero_cards": hero_cards,
                 "community_cards": board_cards,
                 "players": [{"position": "dealer", "name": "Hero", "stack": 1500, "current_bet": 0, "last_action": None, "is_active": True}],
                 "betting_round": phase_hint or self.determine_phase_from_detections(board_cards, phase_hint),
-                "confidence_level": confidence,
-                "analysis_method": "google_vision_api_real",
+                "confidence_level": global_confidence,
+                "analysis_method": "google_vision_api_with_ai",
                 "needs_user_input": needs_input,
                 "user_requests": user_requests,
                 "api_call_success": True,
-                "ocr_raw_text": ocr_results.get('full_text', ''),
-                "detection_count": len(ocr_results.get('individual_texts', [])),
-                "real_api_used": True
+                "ocr_raw_text": full_text[:500],  # Limiter pour log
+                "detection_count": len(text_annotations),
+                "real_api_used": True,
+                "ai_interpretation": {
+                    "used": True,
+                    "confidence": ai_confidence,
+                    "notes": ai_result.get('interpretation_notes', ''),
+                    "corrections": ai_result.get('corrections_made', [])
+                }
             }
             
             if needs_input:
-                print(f"⚠️ DÉTECTION INCOMPLÈTE - Demande correction utilisateur")
+                print(f"⚠️ CORRECTION NÉCESSAIRE - IA demande validation utilisateur")
             else:
-                print(f"✅ DÉTECTION COMPLÈTE via API Google Vision")
+                print(f"✅ ANALYSE COMPLÈTE - Google Vision + IA réussi")
             
             return result
             
         except Exception as e:
-            print(f"❌ ERREUR APPEL GOOGLE VISION API: {e}")
-            # NE PAS utiliser de fallback aléatoire, demander à l'utilisateur
+            print(f"❌ ERREUR GOOGLE VISION + IA: {e}")
             return self.request_real_user_input_after_api_failure(phase_hint, str(e))
+    
+    async def interpret_with_ai(self, full_text: str, phase_hint: str, position_info: List[Dict]) -> Dict[str, Any]:
+        """Interprète les résultats OCR avec l'IA générative"""
+        try:
+            ai_interpreter = get_ai_interpreter()
+            result = await ai_interpreter.interpret_ocr_results(full_text, phase_hint, position_info)
+            return result
+            
+        except Exception as e:
+            print(f"❌ Erreur interprétation IA: {e}")
+            return {
+                "hero_cards": [],
+                "community_cards": [],
+                "confidence": 0.0,
+                "interpretation_notes": f"Erreur IA: {str(e)}",
+                "corrections_made": [],
+                "ai_error": True
+            }
+    
+    def estimate_pot_from_text(self, text: str) -> int:
+        """Estime le pot depuis le texte OCR"""
+        import re
+        numbers = re.findall(r'\d+', text)
+        if numbers:
+            # Prendre le plus grand nombre probable
+            pot_candidates = [int(n) for n in numbers if 50 <= int(n) <= 10000]
+            return max(pot_candidates) if pot_candidates else 150
+        return 150
     
     def calculate_real_confidence(self, hero_cards: List[str], board_cards: List[str], 
                                  expected_board: int, ocr_results: Dict) -> float:
