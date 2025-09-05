@@ -203,13 +203,19 @@ async def analyze_screen_capture(data: ScreenCaptureData):
         if detected_elements.get("needs_user_input", False):
             print("🙋 Informations manquantes détectées - interaction utilisateur requise")
             
-            # Retourner immédiatement avec demandes d'informations
+            # COMPATIBILITÉ FRONTEND : Garder la structure normale mais ajouter les demandes
             processing_time = time.time() - start_time
             incomplete_result = PokerAnalysisResult(
                 session_id=data.session_id,
-                detected_elements=detected_elements,
+                detected_elements=detected_elements,  # Inclut déjà hero_cards et community_cards
                 game_state=None,
-                recommendation=None,
+                recommendation={
+                    "action": "unknown",
+                    "confidence": 0.0,
+                    "reasoning": "Informations manquantes. Veuillez saisir vos cartes pour obtenir une recommandation.",
+                    "needs_user_input": True,
+                    "user_requests": detected_elements.get("user_requests", [])
+                },
                 confidence=detected_elements.get("confidence_level", 0.0),
                 processing_time=processing_time,
                 analysis_type="incomplete_awaiting_user_input"
