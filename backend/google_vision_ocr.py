@@ -207,6 +207,57 @@ class GoogleVisionCardRecognizer:
             print(f"❌ ERREUR GOOGLE VISION + IA: {e}")
             return self.request_real_user_input_after_api_failure(phase_hint, str(e))
     
+    def run_ai_interpretation(self, full_text: str, phase_hint: str, position_info: List[Dict]) -> Dict[str, Any]:
+        """Version synchrone pour exécuter l'interprétation IA"""
+        try:
+            # Créer un nouveau loop pour ce thread
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(self.interpret_with_ai(full_text, phase_hint, position_info))
+                return result
+            finally:
+                loop.close()
+        except Exception as e:
+            print(f"❌ Erreur exécution IA: {e}")
+            return self.get_fallback_ai_interpretation(full_text, phase_hint)
+    
+    def get_fallback_ai_interpretation(self, full_text: str, phase_hint: str) -> Dict[str, Any]:
+        """Fallback si l'IA ne fonctionne pas"""
+        print("🔄 Fallback IA: Utilisation regex basique")
+        
+        import re
+        
+        # Extraction basique
+        card_pattern = r'([AKQJT2-9]|10)([♠♥♦♣SHDC])'
+        matches = re.findall(card_pattern, full_text.upper())
+        
+        cards = []
+        for rank, suit in matches:
+            # Corrections
+            if suit == '♠': suit = 'S'
+            elif suit == '♥': suit = 'H'
+            elif suit == '♦': suit = 'D'
+            elif suit == '♣': suit = 'C'
+            elif rank == '10': rank = 'T'
+            
+            if len(rank) == 1 and len(suit) == 1:
+                cards.append(f"{rank}{suit}")
+        
+        # Répartition
+        expected_board = {'preflop': 0, 'flop': 3, 'turn': 4, 'river': 5}.get(phase_hint, 0)
+        hero_cards = cards[:2] if len(cards) >= 2 else cards
+        board_cards = cards[2:2+expected_board] if len(cards) > 2 else []
+        
+        return {
+            "hero_cards": hero_cards,
+            "community_cards": board_cards,
+            "confidence": 0.4,
+            "interpretation_notes": "Fallback regex: IA indisponible",
+            "corrections_made": ["Extraction regex basique"],
+            "fallback_used": True
+        }
+
     async def interpret_with_ai(self, full_text: str, phase_hint: str, position_info: List[Dict]) -> Dict[str, Any]:
         """Interprète les résultats OCR avec l'IA générative"""
         try:
