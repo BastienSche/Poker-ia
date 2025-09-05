@@ -236,12 +236,31 @@ async def analyze_screen_capture(data: ScreenCaptureData):
             detected_elements["community_cards"] = clean_detected_cards(detected_elements["community_cards"])
             print(f"🎯 Board cards: {original_board} → {detected_elements['community_cards']}")
         
-        # Détermination automatique de la phase
-        auto_phase = determine_phase_from_board(detected_elements.get("community_cards", []))
-        detected_phase = detected_elements.get("betting_round", auto_phase)
-        if detected_phase != auto_phase:
-            print(f"⚠️ Phase corrigée: {detected_phase} → {auto_phase}")
-            detected_elements["betting_round"] = auto_phase
+        # Détermination automatique de la phase SEULEMENT si pas de hint
+        if not data.phase_hint:
+            auto_phase = determine_phase_from_board(detected_elements.get("community_cards", []))
+            detected_phase = detected_elements.get("betting_round", auto_phase)
+            if detected_phase != auto_phase:
+                print(f"⚠️ Phase corrigée: {detected_phase} → {auto_phase}")
+                detected_elements["betting_round"] = auto_phase
+        else:
+            # FORCER la phase demandée si hint fourni
+            detected_elements["betting_round"] = data.phase_hint
+            board_cards = detected_elements.get("community_cards", [])
+            print(f"🎯 Phase FORCÉE: {data.phase_hint} | Board détecté: {len(board_cards)} cartes")
+            
+            # Validation du board selon la phase forcée
+            expected_cards = {
+                'preflop': 0,
+                'flop': 3,
+                'turn': 4,
+                'river': 5
+            }
+            expected = expected_cards.get(data.phase_hint, 0)
+            if len(board_cards) != expected:
+                print(f"⚠️ ATTENTION: Phase {data.phase_hint} attendu {expected} cartes, détecté {len(board_cards)}")
+                if data.phase_hint == 'river' and len(board_cards) < 5:
+                    print("🔍 RIVER: Cherchez 5 cartes communes au centre de la table !")
         
         # Construction avancée de l'état de jeu
         game_state = None
