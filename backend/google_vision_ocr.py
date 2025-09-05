@@ -496,6 +496,12 @@ def get_google_vision_ocr():
             print("🔄 Utilisation du système de fallback")
             # Return a fallback object
             google_vision_ocr = FallbackVisionRecognizer()
+    
+    # Double vérification
+    if google_vision_ocr is None:
+        print("❌ ERREUR CRITIQUE: google_vision_ocr est toujours None, utilisation fallback forcé")
+        google_vision_ocr = FallbackVisionRecognizer()
+    
     return google_vision_ocr
 
 class FallbackVisionRecognizer:
