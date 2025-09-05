@@ -279,7 +279,7 @@ function App() {
         setStats(prev => ({
           handsAnalyzed: prev.handsAnalyzed + 1,
           avgConfidence: ((prev.avgConfidence * prev.handsAnalyzed + (result.confidence || 0)) / (prev.handsAnalyzed + 1)),
-          lastUpdateTime: new Date(),
+          lastUpdateTime: new Date().toLocaleTimeString(),
           avgProcessingTime: prev.avgProcessingTime
         }));
         
