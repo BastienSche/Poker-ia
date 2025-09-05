@@ -66,6 +66,13 @@ function App() {
   const [currentStatus, setCurrentStatus] = useState('Prêt');
   const [analysisStep, setAnalysisStep] = useState('');
   
+  // NOUVEAU : États pour saisie utilisateur
+  const [showCardInput, setShowCardInput] = useState(false);
+  const [inputHeroCards, setInputHeroCards] = useState('');
+  const [inputBoardCards, setInputBoardCards] = useState('');
+  const [userRequests, setUserRequests] = useState([]);
+  const [isCompletingAnalysis, setIsCompletingAnalysis] = useState(false);
+  
   // Refs
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
