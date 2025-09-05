@@ -1085,27 +1085,20 @@ class GoogleVisionCardRecognizer:
             "error": error_msg
         }
 
-# Instance globale - Lazy initialization
+# Instance globale - FORCÉ À UTILISER L'API RÉELLE
 google_vision_ocr = None
 
 def get_google_vision_ocr():
-    """Lazy initialization of Google Vision OCR"""
+    """Initialisation FORCÉE de Google Vision OCR - AUCUN FALLBACK"""
     global google_vision_ocr
     if google_vision_ocr is None:
+        print("🔄 INITIALISATION FORCÉE Google Vision OCR...")
         try:
-            print("🔄 Initialisation Google Vision OCR...")
             google_vision_ocr = GoogleVisionCardRecognizer()
-            print("✅ Google Vision OCR initialisé avec succès")
+            print("✅ Google Vision OCR initialisé - PRÊT POUR APPELS API RÉELS")
         except Exception as e:
-            print(f"⚠️ Google Vision OCR initialization failed: {e}")
-            print("🔄 Utilisation du système de fallback")
-            # Return a fallback object
-            google_vision_ocr = FallbackVisionRecognizer()
-    
-    # Double vérification
-    if google_vision_ocr is None:
-        print("❌ ERREUR CRITIQUE: google_vision_ocr est toujours None, utilisation fallback forcé")
-        google_vision_ocr = FallbackVisionRecognizer()
+            print(f"❌ ÉCHEC CRITIQUE initialisation Google Vision: {e}")
+            raise Exception(f"ARRÊT - Impossible d'initialiser Google Vision API: {e}")
     
     return google_vision_ocr
 
