@@ -68,12 +68,22 @@ function App() {
   const [currentStatus, setCurrentStatus] = useState('Prêt');
   const [analysisStep, setAnalysisStep] = useState('');
   
-  // NOUVEAU : États pour saisie utilisateur
+  // NOUVEAU : États pour sélection de cartes avec interface
   const [showCardInput, setShowCardInput] = useState(false);
-  const [inputHeroCards, setInputHeroCards] = useState('');
-  const [inputBoardCards, setInputBoardCards] = useState('');
+  const [selectedHeroCards, setSelectedHeroCards] = useState([]);
+  const [selectedBoardCards, setSelectedBoardCards] = useState([]);
   const [userRequests, setUserRequests] = useState([]);
   const [isCompletingAnalysis, setIsCompletingAnalysis] = useState(false);
+  const [cardSelectionStep, setCardSelectionStep] = useState('hero'); // 'hero' ou 'board'
+
+  // Définition des cartes de poker
+  const RANKS = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'];
+  const SUITS = [
+    { symbol: '♠', code: 'S', name: 'Pique', color: 'text-gray-800' },
+    { symbol: '♥', code: 'H', name: 'Cœur', color: 'text-red-500' },
+    { symbol: '♦', code: 'D', name: 'Carreau', color: 'text-red-500' },
+    { symbol: '♣', code: 'C', name: 'Trèfle', color: 'text-gray-800' }
+  ];
   
   // Refs
   const videoRef = useRef(null);
