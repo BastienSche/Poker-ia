@@ -27,5 +27,5 @@ emergentintegrations --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/sim
 websockets>=12.0
 pillow>=10.0.0
 treys>=0.1.8
-deuces>=0.2.7
-pokereval>=0.5.1
+deuces>=0.2.1
+pokerkit>=0.4.0
