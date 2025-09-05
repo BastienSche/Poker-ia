@@ -332,8 +332,8 @@ function App() {
       addLog(`✅ Image capturée: ${targetWidth}x${targetHeight} pour ${phase}`, 'success');
       updateStatus(`Analyse ${phase}`, 'Conversion de l\'image...');
       
-      // Conversion optimisée en base64 ULTRA-RAPIDE
-      const imageData = canvas.toDataURL('image/jpeg', 0.70); // Qualité réduite pour vitesse max
+      // Conversion optimisée en base64 HAUTE QUALITÉ pour OCR
+      const imageData = canvas.toDataURL('image/png', 1.0); // PNG qualité maximale pour OCR
       const base64Data = imageData.split(',')[1];
       
       addLog(`📦 Image convertie: ${(base64Data.length / 1024).toFixed(1)}KB`, 'success');
