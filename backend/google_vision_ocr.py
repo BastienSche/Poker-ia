@@ -435,9 +435,21 @@ class GoogleVisionCardRecognizer:
         """Détecte les cartes du héros avec analyse de position"""
         cards = []
         
-        print("🃏 Recherche cartes héros...")
+        print("🃏 === RECHERCHE CARTES HÉROS ===")
+        print(f"📝 Texte complet OCR: '{full_text}'")
+        print(f"📊 Nombre d'annotations: {len(text_annotations)}")
+        
+        # Log de toutes les annotations détectées
+        for i, annotation in enumerate(text_annotations[1:10]):  # Log premières 10
+            text = annotation.get('description', '').upper().strip()
+            vertices = annotation.get('boundingPoly', {}).get('vertices', [])
+            if vertices and len(vertices) >= 2:
+                avg_y = sum(v.get('y', 0) for v in vertices) / len(vertices)
+                avg_x = sum(v.get('x', 0) for v in vertices) / len(vertices)
+                print(f"   [{i}] '{text}' à position ({avg_x:.0f}, {avg_y:.0f})")
         
         # Stratégie 1: Recherche de patterns de cartes dans les annotations
+        hero_positions = []
         for annotation in text_annotations[1:]:  # Skip le premier (texte complet)
             text = annotation.get('description', '').upper().strip()
             vertices = annotation.get('boundingPoly', {}).get('vertices', [])
@@ -448,22 +460,33 @@ class GoogleVisionCardRecognizer:
                 avg_x = sum(v.get('x', 0) for v in vertices) / len(vertices)
                 
                 # Les cartes héros sont généralement en bas de l'écran
-                is_hero_position = avg_y > 600  # Ajuster selon résolution
+                is_hero_position = avg_y > 400  # Position basse pour héros
                 
                 if is_hero_position:
                     card = self.parse_single_card(text)
                     if card and card not in cards:
                         cards.append(card)
-                        print(f"🎯 Carte héros détectée: {card} à position ({avg_x:.0f}, {avg_y:.0f})")
+                        hero_positions.append((avg_x, avg_y))
+                        print(f"🎯 CARTE HÉROS TROUVÉE: {card} à position ({avg_x:.0f}, {avg_y:.0f})")
         
         # Stratégie 2: Patterns dans le texte complet
         if len(cards) < 2:
+            print("🔍 Recherche dans texte complet...")
             regex_cards = self.find_cards_with_regex(full_text)
             for card in regex_cards:
                 if card not in cards and len(cards) < 2:
                     cards.append(card)
+                    print(f"🎯 CARTE HÉROS (regex): {card}")
         
-        print(f"✅ Cartes héros trouvées: {cards}")
+        print(f"✅ RÉSULTAT HÉROS: {len(cards)} cartes trouvées = {cards}")
+        
+        # Si pas assez de cartes, logger pourquoi
+        if len(cards) < 2:
+            print(f"⚠️ HÉROS INCOMPLET: Seulement {len(cards)}/2 cartes détectées")
+            print(f"   - Annotations analysées: {len(text_annotations)}")
+            print(f"   - Texte analysé: '{full_text[:50]}...'")
+            print(f"   - Positions héros trouvées: {len(hero_positions)}")
+        
         return cards[:2]  # Maximum 2 cartes
     
     def detect_community_cards(self, text_annotations: List[Dict], full_text: str, phase_hint: str) -> List[str]:
@@ -471,12 +494,15 @@ class GoogleVisionCardRecognizer:
         cards = []
         expected_count = {'preflop': 0, 'flop': 3, 'turn': 4, 'river': 5}.get(phase_hint, 0)
         
-        print(f"🎯 Recherche {expected_count} cartes communes pour phase {phase_hint}...")
+        print(f"🎯 === RECHERCHE CARTES COMMUNES ({phase_hint}) ===")
+        print(f"🎯 Attendu: {expected_count} cartes")
         
         if expected_count == 0:
+            print("✅ PREFLOP: 0 cartes communes attendues")
             return []
         
         # Recherche dans les annotations avec position centrale
+        board_positions = []
         for annotation in text_annotations[1:]:
             text = annotation.get('description', '').upper().strip()
             vertices = annotation.get('boundingPoly', {}).get('vertices', [])
@@ -486,22 +512,32 @@ class GoogleVisionCardRecognizer:
                 avg_x = sum(v.get('x', 0) for v in vertices) / len(vertices)
                 
                 # Les cartes communes sont au centre de la table
-                is_center_position = (300 < avg_y < 600) and (200 < avg_x < 800)
+                is_center_position = (200 < avg_y < 500) and (150 < avg_x < 700)
                 
                 if is_center_position:
                     card = self.parse_single_card(text)
                     if card and card not in cards:
                         cards.append(card)
-                        print(f"🃏 Carte commune détectée: {card} à position ({avg_x:.0f}, {avg_y:.0f})")
+                        board_positions.append((avg_x, avg_y))
+                        print(f"🃏 CARTE BOARD TROUVÉE: {card} à position ({avg_x:.0f}, {avg_y:.0f})")
         
         # Si pas assez de cartes détectées, chercher dans le texte complet
         if len(cards) < expected_count:
+            print("🔍 Recherche board dans texte complet...")
             regex_cards = self.find_cards_with_regex(full_text)
             for card in regex_cards:
                 if card not in cards and len(cards) < expected_count:
                     cards.append(card)
+                    print(f"🃏 CARTE BOARD (regex): {card}")
         
-        print(f"✅ Cartes communes trouvées: {cards} (attendu: {expected_count})")
+        print(f"✅ RÉSULTAT BOARD: {len(cards)}/{expected_count} cartes trouvées = {cards}")
+        
+        # Logger si incomplet
+        if len(cards) != expected_count:
+            print(f"⚠️ BOARD INCOMPLET: {len(cards)}/{expected_count} cartes pour {phase_hint}")
+            print(f"   - Positions board trouvées: {len(board_positions)}")
+            print(f"   - Cartes manquantes: {expected_count - len(cards)}")
+        
         return cards[:expected_count]
     
     def parse_single_card(self, text: str) -> Optional[str]:
