@@ -201,27 +201,44 @@ async def analyze_screen_capture(data: ScreenCaptureData):
         
         # Vérifier si des informations manquent et nécessitent interaction utilisateur
         if detected_elements.get("needs_user_input", False):
-            print("🙋 Informations manquantes détectées - interaction utilisateur requise")
+            print("🙋 === INFORMATIONS MANQUANTES - DEMANDE UTILISATEUR ===")
             
-            # COMPATIBILITÉ FRONTEND : Garder la structure normale mais ajouter les demandes
+            # Logger les détections partielles
+            hero_found = detected_elements.get("hero_cards", [])
+            board_found = detected_elements.get("community_cards", [])
+            user_requests = detected_elements.get("user_requests", [])
+            
+            print(f"🃏 Cartes héros trouvées: {len(hero_found)} = {hero_found}")
+            print(f"🎯 Cartes board trouvées: {len(board_found)} = {board_found}")
+            print(f"🙋 Demandes utilisateur: {len(user_requests)}")
+            
+            for req in user_requests:
+                print(f"   - {req.get('type')}: {req.get('message')}")
+            
+            # COMPATIBILITÉ FRONTEND : Recommendation claire pour demander input
             processing_time = time.time() - start_time
             incomplete_result = PokerAnalysisResult(
                 session_id=data.session_id,
-                detected_elements=detected_elements,  # Inclut déjà hero_cards et community_cards
+                detected_elements=detected_elements,  # Inclut les cartes partielles trouvées
                 game_state=None,
                 recommendation={
-                    "action": "unknown",
+                    "action": "input_required",  # ACTION CLAIRE
                     "confidence": 0.0,
-                    "reasoning": "Informations manquantes. Veuillez saisir vos cartes pour obtenir une recommandation.",
+                    "reasoning": f"🤖 API Google Vision: Héros {len(hero_found)}/2, Board {len(board_found)}. Veuillez compléter les informations manquantes.",
                     "needs_user_input": True,
-                    "user_requests": detected_elements.get("user_requests", [])
+                    "user_requests": user_requests,
+                    "phase": data.phase_hint or 'preflop',
+                    "partial_detection": {
+                        "hero_cards_found": len(hero_found),
+                        "board_cards_found": len(board_found)
+                    }
                 },
                 confidence=detected_elements.get("confidence_level", 0.0),
                 processing_time=processing_time,
                 analysis_type="incomplete_awaiting_user_input"
             )
             
-            print(f"⚠️ Analyse incomplète - demande utilisateur en {processing_time:.2f}s")
+            print(f"⚠️ ANALYSE INCOMPLÈTE - Demande utilisateur en {processing_time:.2f}s")
             return incomplete_result.dict()
         
         # Validation et correction des cartes détectées (si détection complète)
