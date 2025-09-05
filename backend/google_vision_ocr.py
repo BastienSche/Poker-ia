@@ -115,8 +115,22 @@ class GoogleVisionCardRecognizer:
                         'y': avg_y
                     })
             
-            # Appel asynchrone à l'IA (dans le contexte sync)
-            ai_result = asyncio.run(self.interpret_with_ai(full_text, phase_hint, position_info))
+            # Appel à l'IA (gérer le contexte async/sync)
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # Nous sommes dans un contexte async - créer une tâche
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(self.run_ai_interpretation, full_text, phase_hint, position_info)
+                        ai_result = future.result(timeout=30)
+                else:
+                    # Pas de loop - utiliser asyncio.run
+                    ai_result = asyncio.run(self.interpret_with_ai(full_text, phase_hint, position_info))
+            except Exception as async_error:
+                print(f"❌ Erreur contexte async: {async_error}")
+                # Fallback synchrone
+                ai_result = self.get_fallback_ai_interpretation(full_text, phase_hint)
             
             # ÉTAPE 4: Validation et construction du résultat final
             hero_cards = ai_result.get('hero_cards', [])
