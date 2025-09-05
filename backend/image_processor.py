@@ -48,51 +48,27 @@ class PokerImageProcessor:
             print(f"Erreur lors de l'optimisation d'image: {e}")
             return image_base64  # Retour de l'image originale en cas d'erreur
     
-    def _smart_resize(self, image: Image.Image) -> Image.Image:
-        """Redimensionnement intelligent pour préserver les détails importants"""
-        original_width, original_height = image.size
-        
-        # Calcul du ratio pour conserver les proportions
-        width_ratio = self.target_width / original_width
-        height_ratio = self.target_height / original_height
-        
-        # Utilisation du ratio le plus petit pour éviter la déformation
-        ratio = min(width_ratio, height_ratio)
-        
-        # Nouvelles dimensions
-        new_width = int(original_width * ratio)
-        new_height = int(original_height * ratio)
-        
-        # Redimensionnement avec algorithme de haute qualité
-        return image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+    def _fast_resize(self, image: Image.Image) -> Image.Image:
+        """Redimensionnement ultra-rapide"""
+        # Redimensionnement direct sans préservation parfaite des proportions pour vitesse
+        return image.resize((self.target_width, self.target_height), Image.Resampling.BILINEAR)
     
-    def _enhance_for_cards(self, image: Image.Image) -> Image.Image:
-        """Améliore l'image spécifiquement pour la reconnaissance de cartes"""
-        # Amélioration du contraste pour faire ressortir les cartes
+    def _light_enhance(self, image: Image.Image) -> Image.Image:
+        """Amélioration légère ultra-rapide"""
+        # Seulement un léger contraste pour vitesse
         enhancer = ImageEnhance.Contrast(image)
-        image = enhancer.enhance(1.2)  # +20% de contraste
-        
-        # Amélioration de la netteté pour les textes et symboles
-        enhancer = ImageEnhance.Sharpness(image)
-        image = enhancer.enhance(1.3)  # +30% de netteté
-        
-        # Légère amélioration de la luminosité pour les cartes sombres
-        enhancer = ImageEnhance.Brightness(image)
-        image = enhancer.enhance(1.1)  # +10% de luminosité
-        
-        return image
+        return enhancer.enhance(1.1)  # Très léger
     
-    def _compress_image(self, image: Image.Image) -> str:
-        """Compression JPEG optimisée"""
+    def _fast_compress(self, image: Image.Image) -> str:
+        """Compression ultra-rapide"""
         buffer = io.BytesIO()
         
-        # Sauvegarde avec optimisation JPEG
+        # Sauvegarde rapide sans optimisations coûteuses
         image.save(
             buffer, 
             format='JPEG', 
-            quality=self.jpeg_quality,
-            optimize=True,  # Optimisation automatique
-            progressive=True  # JPEG progressif pour un chargement plus rapide
+            quality=self.jpeg_quality
+            # Pas d'optimize=True ni progressive=True pour plus de vitesse
         )
         
         # Encodage en base64
