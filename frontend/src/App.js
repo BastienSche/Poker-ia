@@ -997,6 +997,99 @@ function App() {
               </div>
             )}
 
+            {/* NOUVEAU : Interface de saisie des cartes manquantes */}
+            {showCardInput && (
+              <div className="bg-gradient-to-r from-orange-900/20 to-red-900/20 border border-orange-500/30 rounded-xl p-6 mb-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <AlertTriangle className="w-5 h-5 text-orange-400" />
+                  <h2 className="text-lg font-semibold text-orange-100">🙋 Saisie Manuelle Requise</h2>
+                  <span className="px-2 py-1 bg-orange-900/30 text-orange-300 text-xs rounded-lg">
+                    OCR Incomplet
+                  </span>
+                </div>
+                
+                <div className="mb-4 p-3 bg-orange-900/20 rounded-lg">
+                  <p className="text-sm text-orange-200 mb-2">
+                    🤖 <strong>Google Vision API</strong> n'a pas pu détecter toutes les cartes. 
+                    Veuillez saisir les informations manquantes :
+                  </p>
+                  {userRequests.map((req, index) => (
+                    <div key={index} className="text-xs text-orange-300 mb-1">
+                      • {req.message}
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  {/* Saisie cartes héros */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      🃏 Vos cartes (2 cartes requises)
+                    </label>
+                    <input
+                      type="text"
+                      value={inputHeroCards}
+                      onChange={(e) => setInputHeroCards(e.target.value)}
+                      placeholder="Ex: AS KH"
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-orange-400 focus:outline-none"
+                    />
+                    <div className="text-xs text-slate-400 mt-1">
+                      Format: Rang (A,K,Q,J,T,9-2) + Couleur (S,H,D,C)
+                    </div>
+                  </div>
+                  
+                  {/* Saisie cartes board */}
+                  {currentPhase !== 'preflop' && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        🎯 Cartes Board ({currentPhase === 'flop' ? '3' : currentPhase === 'turn' ? '4' : '5'} cartes)
+                      </label>
+                      <input
+                        type="text"
+                        value={inputBoardCards}
+                        onChange={(e) => setInputBoardCards(e.target.value)}
+                        placeholder={currentPhase === 'flop' ? "Ex: AS KH QD" : currentPhase === 'turn' ? "Ex: AS KH QD JC" : "Ex: AS KH QD JC TS"}
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-orange-400 focus:outline-none"
+                      />
+                      <div className="text-xs text-slate-400 mt-1">
+                        Séparez les cartes par des espaces
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={completeAnalysisWithUserInput}
+                    disabled={isCompletingAnalysis || !inputHeroCards.trim()}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors font-medium ${
+                      isCompletingAnalysis || !inputHeroCards.trim()
+                        ? 'bg-gray-600 cursor-not-allowed text-gray-300'
+                        : 'bg-orange-600 hover:bg-orange-700 text-white'
+                    }`}
+                    type="button"
+                  >
+                    {isCompletingAnalysis ? <Loader className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                    {isCompletingAnalysis ? 'Analyse...' : 'Analyser avec ces cartes'}
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setShowCardInput(false);
+                      setInputHeroCards('');
+                      setInputBoardCards('');
+                      addLog('❌ Saisie manuelle annulée', 'info');
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 rounded-lg transition-colors font-medium text-white"
+                    type="button"
+                  >
+                    <X className="w-4 h-4" />
+                    Annuler
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Contrôles de capture avec debug */}
             <div className="bg-slate-800/50 backdrop-blur rounded-xl p-6 border border-slate-700">
               <div className="flex items-center justify-between mb-4">
