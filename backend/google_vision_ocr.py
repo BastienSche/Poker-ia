@@ -25,11 +25,27 @@ class GoogleVisionCardRecognizer:
     """Reconnaissance de cartes avec Google Vision API"""
     
     def __init__(self):
+        print("🔄 Initialisation GoogleVisionCardRecognizer...")
+        
+        # Charger les variables d'environnement
+        load_dotenv()
+        
         self.api_key = os.environ.get('GOOGLE_CLOUD_API_KEY')
+        print(f"🔑 API Key trouvée: {bool(self.api_key)} ({'***' + self.api_key[-4:] if self.api_key else 'None'})")
+        
         if not self.api_key:
             raise ValueError("GOOGLE_CLOUD_API_KEY non trouvée dans les variables d'environnement")
         
         self.api_url = "https://vision.googleapis.com/v1/images:annotate"
+        print(f"🌐 API URL: {self.api_url}")
+        
+        # Test de connectivité basique
+        try:
+            import requests
+            test_response = requests.get("https://www.google.com", timeout=5)
+            print(f"🌐 Test connectivité: OK ({test_response.status_code})")
+        except Exception as e:
+            print(f"⚠️ Test connectivité échoué: {e}")
         
         # Mappings pour la reconnaissance de cartes
         self.rank_mappings = {
@@ -54,6 +70,8 @@ class GoogleVisionCardRecognizer:
             '♦': 'D', 'DIAMONDS': 'D', 'CARREAU': 'D', 'D': 'D',
             '♣': 'C', 'CLUBS': 'C', 'TREFLE': 'C', 'C': 'C'
         }
+        
+        print("✅ GoogleVisionCardRecognizer initialisé avec succès")
         
     def analyze_poker_image_vision(self, image_base64: str, phase_hint: str = None) -> Dict[str, Any]:
         """
