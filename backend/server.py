@@ -270,11 +270,32 @@ async def analyze_screen_capture(data: ScreenCaptureData):
         # Calcul du temps de traitement
         processing_time = time.time() - start_time
         
+        # Conversion manuelle de GameState en dict
+        game_state_dict = None
+        if game_state:
+            game_state_dict = {
+                "players": [
+                    {
+                        "name": p.name,
+                        "stack": p.stack,
+                        "position": p.position.value if hasattr(p.position, 'value') else str(p.position),
+                        "current_bet": p.current_bet,
+                        "is_active": p.is_active,
+                        "cards": [f"{c.rank}{c.suit}" for c in p.cards] if p.cards else None
+                    } for p in game_state.players
+                ],
+                "community_cards": [f"{c.rank}{c.suit}" for c in game_state.community_cards],
+                "pot": game_state.pot,
+                "small_blind": game_state.small_blind,
+                "big_blind": game_state.big_blind,
+                "betting_round": game_state.betting_round
+            }
+        
         # Création du résultat
         analysis_result = PokerAnalysisResult(
             session_id=data.session_id,
             detected_elements=detected_elements,
-            game_state=game_state.dict() if game_state else None,
+            game_state=game_state_dict,
             recommendation=recommendation,
             confidence=confidence,
             processing_time=processing_time
