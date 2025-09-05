@@ -1,0 +1,96 @@
+<analysis>
+The AI engineer successfully built a comprehensive web application for real-time Texas Hold'em Spin & Go poker analysis, progressing from initial setup to a feature-rich, optimized, and now free-to-use product. The development trajectory highlights an iterative process driven by detailed user feedback. Initially, the focus was on establishing a React frontend and FastAPI backend with OpenAI Vision for card recognition. Subsequent interactions led to significant performance optimizations, including caching and a shift to local computer vision to reduce latency and cost. Key challenges involved accurate board recognition, addressing  errors in the poker engine, and improving UI responsiveness. The engineer consistently adapted the architecture, integrating advanced poker libraries (, ) for precise equity and ICM calculations. The final pivot involved replacing OpenAI Vision with a 100% free local computer vision solution, prompted by budget exhaustion. Throughout, the engineer demonstrated strong problem-solving, incorporating a detailed debug console and sequential analysis guide to enhance user experience and transparency.
+</analysis>
+
+<product_requirements>
+The primary objective is to develop an innovative macOS web application for real-time analysis of 3-player Texas Hold'em Spin & Go poker games. The application needs to capture screen/window, perform advanced visual recognition of poker elements (blinds, bets, chips, players, cards, positions, actions), and provide ergonomic, always-on-top UI with synthetic game views. A strategic analysis engine must calculate optimal actions (fold, call, raise) based on probabilities, ICM, position, stacks, and ranges, with customizable aggressiveness. Security and privacy are paramount, ensuring data isn't transmitted and offering a no-recording option. Customization options include language, capture zone, analysis frequency, and saving game history. The application should be optimized for Apple Silicon MacBooks, using native macOS frameworks. The user later clarified a modern web approach using Web APIs for screen capture and OpenAI Vision, aiming for a complete, production-ready solution, not just an MVP. Further requirements emerged: faster and more accurate analysis, better board recognition, in-app debug logs, detailed poker statistics, sequential game phase analysis, and ultimately, a 100% free, local AI solution for instant analysis due to OpenAI budget concerns.
+</product_requirements>
+
+<key_technical_concepts>
+- React: Frontend framework.
+- FastAPI: Backend API framework.
+- MongoDB: Database for game history.
+- Tailwind CSS: Frontend styling.
+- Screen Capture API: Browser-native screen/window capture.
+- OpenAI Vision: Initial AI for image recognition (later replaced).
+- Computer Vision (Local): OpenCV for image processing/card recognition.
+- WebSockets: Real-time communication between frontend and backend.
+- Treys & Pokerkit: Python libraries for advanced poker equity and game theory calculations.
+- Emergent LLM Key: Used for OpenAI Vision integration.
+</key_technical_concepts>
+
+<code_architecture>
+The application follows a standard full-stack architecture with a React frontend and a FastAPI backend, interacting with a MongoDB database.
+
+
+
+- ****:
+    - **Importance**: Main FastAPI application entry point, defines API routes, handles request/response, integrates with  and .
+    - **Changes**:
+        - Initial setup with basic  and  endpoints.
+        - Integrated OpenAI Vision calls.
+        - Updated to handle  object conversion errors.
+        - Modified to incorporate  and  for advanced analysis.
+        - Adapted to use local computer vision (OpenCV) instead of OpenAI Vision, including new  endpoint.
+        - Implemented  and  in responses.
+        - Added WebSocket endpoint for real-time updates.
+        - Incorporated  value checks to prevent comparison errors.
+        - Optimized for speed and phase detection logic.
+- ****:
+    - **Importance**: Lists Python dependencies for the backend.
+    - **Changes**:
+        - Added  (for OpenAI integration), , , .
+        - Added  for local computer vision.
+- ****:
+    - **Importance**: Stores backend environment variables, specifically  and  (initially), .
+    - **Changes**: Updated  usage and removed explicit  in favor of .
+- ****:
+    - **Importance**: Handles image preprocessing, optimization, and computer vision tasks.
+    - **Changes**:
+        - Created to encapsulate image handling logic.
+        - Implemented image compression and resizing.
+        - Developed specialized prompts for OpenAI Vision to detect poker elements (cards, board).
+        - Updated to use OpenCV for local card and board recognition, replacing external AI.
+        - Enhanced for phase detection based on board cards.
+- ****:
+    - **Importance**: Contains the core poker logic, probability calculations, and strategic recommendations.
+    - **Changes**:
+        - Created to house the poker analysis engine.
+        - Integrated  and  for accurate equity, ICM, and hand strength calculations.
+        - Implemented advanced analysis considering position, stacks, blinds, and opponent ranges.
+        - Added protection against  errors during calculations.
+        - Refined for sequential analysis logic (preflop, flop, turn, river).
+- ****:
+    - **Importance**: Main React component, orchestrates UI, screen capture, API calls, and displays results.
+    - **Changes**:
+        - Initial UI setup for screen capture and analysis display.
+        - Integrated Screen Capture API.
+        - Implemented real-time statistics display.
+        - Added an in-app debug console with color-coded logs.
+        - Enhanced recommendation interface with detailed strategic insights (pot odds, equity, ICM).
+        - Incorporated sequential analysis guide and phase-specific buttons.
+        - Updated to reflect local AI usage and 100% free status.
+        - Fixed button functionality and various JavaScript errors.
+- ****:
+    - **Importance**: Handles local AI logic for instant analysis and caching on the frontend.
+    - **Changes**:
+        - Created to provide an alternative to external AI calls, primarily for speed.
+        - Implemented client-side image processing and caching.
+- ****:
+    - **Importance**: Stores frontend environment variables, primarily .
+    - **Changes**: Maintained  as per architectural guidelines.
+</code_architecture>
+
+<pending_tasks>
+- **Phase Detection Bug**: The user reported that the application still returns to the Flop (3 board cards) when attempting River analysis, indicating an issue with sequential phase detection.
+- **Performance Optimization**: Despite attempts, the user still finds the analysis beaucoup trop long. Further speed optimization is required beyond the current cache and local CV implementation.
+- **Frontend UI Update for Free Status**: The AI engineer was about to update the frontend to reflect the 100% GRATUIT status.
+</pending_tasks>
+
+<current_work>
+Immediately before this summary request, the AI engineer completed a major architectural shift in the backend: transitioning from an OpenAI Vision-based analysis to a 100% free, local computer vision (OpenCV) solution. This change was necessitated by the user reporting that the OpenAI budget had been exceeded. The engineer updated  to include , modified  and  to integrate local CV, and introduced a new API endpoint . Initial tests for this new free API endpoint () showed an ULTRA-RAPIDE response time of 0.001s, indicating a successful shift away from paid external AI services. The current state is that the backend is configured to use the free local CV, and the API reflects this with a 100% GRATUIT! message.
+</current_work>
+
+<optional_next_step>
+Update the frontend () to prominently display the 100% GRATUIT! status.
+</optional_next_step>

@@ -12,7 +12,7 @@ from PIL import Image
 import time
 
 class PokerAssistantTester:
-    def __init__(self, base_url="https://poker-assistant.preview.emergentagent.com"):
+    def __init__(self, base_url="https://pokeranalyzer-1.preview.emergentagent.com"):
         self.base_url = base_url
         self.api_url = f"{base_url}/api"
         self.session_id = f"test_session_{int(time.time())}"
