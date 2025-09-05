@@ -166,11 +166,11 @@ async def root():
 
 @api_router.post("/analyze-screen")
 async def analyze_screen_capture(data: ScreenCaptureData):
-    """Analyse 100% GRATUITE avec computer vision locale"""
+    """Analyse AVANCÉE avec Google Vision API et interaction utilisateur"""
     start_time = time.time()
     
     try:
-        print(f"🆓 ANALYSE GRATUITE - Session: {data.session_id} - Phase: {data.phase_hint or 'auto'}")
+        print(f"🎯 ANALYSE AVANCÉE - Session: {data.session_id} - Phase: {data.phase_hint or 'auto'}")
         
         # Génération du hash pour le cache INCLUANT LA PHASE
         cache_key = f"{generate_image_hash(data.image_base64)}_{data.phase_hint or 'auto'}"
@@ -182,24 +182,43 @@ async def analyze_screen_capture(data: ScreenCaptureData):
             cached_result["timestamp"] = datetime.utcnow().isoformat()
             cached_result["session_id"] = data.session_id
             cached_result["processing_time"] = 0.001
-            print("💨 Cache hit - résultat instantané (gratuit)")
+            print("💨 Cache hit - résultat instantané")
             return cached_result
         
-        # Optimisation de l'image (gratuite)
-        print("🔄 Optimisation gratuite de l'image...")
+        # Optimisation de l'image (pour améliorer la reconnaissance)
+        print("🔄 Optimisation de l'image pour reconnaissance avancée...")
         optimized_image = image_processor.optimize_image_for_poker_analysis(data.image_base64)
         
-        # *** ANALYSE AVEC GOOGLE VISION API ***
-        print(f"🔍 Analyse Google Vision API pour phase: {data.phase_hint or 'auto'}")
+        # *** ANALYSE AVEC GOOGLE VISION API OPTIMISÉE ***
+        print(f"🔍 Analyse Google Vision API optimisée pour phase: {data.phase_hint or 'auto'}")
         google_vision_ocr = get_google_vision_ocr()
         detected_elements = google_vision_ocr.analyze_poker_image_vision(
             data.image_base64, 
             data.phase_hint
         )
         
-        print(f"✅ Analyse gratuite terminée: Hero={len(detected_elements.get('hero_cards', []))}, Board={len(detected_elements.get('community_cards', []))}")
+        print(f"✅ Analyse Google Vision terminée: Hero={len(detected_elements.get('hero_cards', []))}, Board={len(detected_elements.get('community_cards', []))}")
         
-        # Validation et correction des cartes détectées
+        # Vérifier si des informations manquent et nécessitent interaction utilisateur
+        if detected_elements.get("needs_user_input", False):
+            print("🙋 Informations manquantes détectées - interaction utilisateur requise")
+            
+            # Retourner immédiatement avec demandes d'informations
+            processing_time = time.time() - start_time
+            incomplete_result = PokerAnalysisResult(
+                session_id=data.session_id,
+                detected_elements=detected_elements,
+                game_state=None,
+                recommendation=None,
+                confidence=detected_elements.get("confidence_level", 0.0),
+                processing_time=processing_time,
+                analysis_type="incomplete_awaiting_user_input"
+            )
+            
+            print(f"⚠️ Analyse incomplète - demande utilisateur en {processing_time:.2f}s")
+            return incomplete_result.dict()
+        
+        # Validation et correction des cartes détectées (si détection complète)
         if "hero_cards" in detected_elements and detected_elements["hero_cards"]:
             original_hero = detected_elements["hero_cards"].copy()
             detected_elements["hero_cards"] = clean_detected_cards(detected_elements["hero_cards"])
@@ -210,18 +229,8 @@ async def analyze_screen_capture(data: ScreenCaptureData):
             detected_elements["community_cards"] = clean_detected_cards(detected_elements["community_cards"])
             print(f"🎯 Board cards: {original_board} → {detected_elements['community_cards']}")
         
-        # Forcer la phase si hint fourni
-        if data.phase_hint:
-            detected_elements["betting_round"] = data.phase_hint
-            board_cards = detected_elements.get("community_cards", [])
-            print(f"🎯 Phase FORCÉE: {data.phase_hint} | Board détecté: {len(board_cards)} cartes")
-            
-            # Validation du board selon la phase forcée
-            expected_cards = {'preflop': 0, 'flop': 3, 'turn': 4, 'river': 5}
-            expected = expected_cards.get(data.phase_hint, 0)
-            if len(board_cards) != expected:
-                print(f"⚠️ ATTENTION: Phase {data.phase_hint} attendu {expected} cartes, détecté {len(board_cards)}")
-        
+        # Suite du traitement normal si toutes les infos sont disponibles...
+        # (Le reste du code reste identique)
         # Construction avancée de l'état de jeu
         game_state = None
         recommendation = None
@@ -285,8 +294,8 @@ async def analyze_screen_capture(data: ScreenCaptureData):
                     betting_round=detected_elements.get("betting_round", "preflop")
                 )
                 
-                # ANALYSE AVANCÉE avec moteur gratuit
-                print("🧠 Calcul de recommandation avancée (gratuit)...")
+                # ANALYSE AVANCÉE avec moteur
+                print("🧠 Calcul de recommandation avancée...")
                 recommendation_result = poker_engine.get_recommended_action(
                     game_state, Position.DEALER, aggressiveness=0.5
                 )
@@ -317,7 +326,7 @@ async def analyze_screen_capture(data: ScreenCaptureData):
                 recommendation = {
                     "action": "fold",
                     "confidence": 0.3,
-                    "reasoning": f"Erreur d'analyse gratuite: {str(e)}",
+                    "reasoning": f"Erreur d'analyse: {str(e)}",
                     "error": True
                 }
         
@@ -353,7 +362,7 @@ async def analyze_screen_capture(data: ScreenCaptureData):
             recommendation=recommendation,
             confidence=confidence,
             processing_time=processing_time,
-            analysis_type="free_cv"
+            analysis_type="google_vision_complete"
         )
         
         # Mise en cache
@@ -368,18 +377,184 @@ async def analyze_screen_capture(data: ScreenCaptureData):
         asyncio.create_task(save_analysis_async(analysis_result))
         asyncio.create_task(broadcast_analysis_async(analysis_result))
         
-        print(f"✅ Analyse gratuite terminée en {processing_time:.2f}s - Coût: 0.00$")
+        print(f"✅ Analyse avancée terminée en {processing_time:.2f}s")
         return analysis_result.dict()
         
     except Exception as e:
         processing_time = time.time() - start_time
-        print(f"❌ Erreur analyse gratuite: {str(e)}")
+        print(f"❌ Erreur analyse avancée: {str(e)}")
+        
+        # En cas d'erreur, demander les infos à l'utilisateur
+        google_vision_ocr = get_google_vision_ocr()
+        error_result = google_vision_ocr.request_user_input_for_analysis(data.phase_hint, str(e))
+        
         return {
-            "error": "FreeAnalysisError",
-            "message": f"Erreur d'analyse gratuite: {str(e)}",
+            "error": "AdvancedAnalysisError",
+            "message": f"Erreur d'analyse avancée: {str(e)}",
             "processing_time": processing_time,
             "session_id": data.session_id,
-            "cost": "0.00$ - Toujours gratuit !"
+            "detected_elements": error_result,
+            "analysis_type": "error_recovery"
+        }
+
+# NOUVEAU : Endpoint pour compléter l'analyse avec les informations utilisateur
+@api_router.post("/complete-analysis")
+async def complete_analysis_with_user_input(data: dict):
+    """Complète l'analyse avec les informations fournies par l'utilisateur"""
+    start_time = time.time()
+    
+    try:
+        session_id = data.get("session_id")
+        phase_hint = data.get("phase_hint")
+        user_hero_cards = data.get("hero_cards", [])
+        user_board_cards = data.get("community_cards", [])
+        
+        print(f"🙋 Complétion analyse - Session: {session_id} - Phase: {phase_hint}")
+        print(f"👤 Cartes utilisateur: Hero={user_hero_cards}, Board={user_board_cards}")
+        
+        # Validation des cartes fournies
+        hero_cards = clean_detected_cards(user_hero_cards)
+        board_cards = clean_detected_cards(user_board_cards)
+        
+        # Vérification cohérence avec la phase
+        expected_board = {'preflop': 0, 'flop': 3, 'turn': 4, 'river': 5}.get(phase_hint, 0)
+        if len(board_cards) != expected_board:
+            return {
+                "error": "InvalidCardCount",
+                "message": f"Phase {phase_hint} nécessite {expected_board} cartes communes, {len(board_cards)} fournies",
+                "expected": expected_board,
+                "provided": len(board_cards)
+            }
+        
+        if len(hero_cards) != 2:
+            return {
+                "error": "InvalidHeroCards",
+                "message": f"2 cartes héros requises, {len(hero_cards)} fournies",
+                "provided": len(hero_cards)
+            }
+        
+        # Construction des éléments détectés avec données utilisateur
+        detected_elements = {
+            "blinds": {"small_blind": 25, "big_blind": 50, "ante": 0},
+            "pot": data.get("pot", 150),
+            "hero_cards": hero_cards,
+            "community_cards": board_cards,
+            "players": [{"position": "dealer", "name": "Hero", "stack": 1500, "current_bet": 0, "last_action": None, "is_active": True}],
+            "betting_round": phase_hint,
+            "confidence_level": 1.0,  # Confiance maximale avec données utilisateur
+            "analysis_method": "user_provided"
+        }
+        
+        # Calcul de la recommandation avec données utilisateur
+        game_state = None
+        recommendation = None
+        
+        try:
+            print("🏗️ Construction état de jeu avec données utilisateur...")
+            
+            # Conversion des cartes
+            hero_card_objects = []
+            for card_str in hero_cards:
+                if len(card_str) == 2:
+                    hero_card_objects.append(Card(rank=card_str[0], suit=card_str[1].lower()))
+            
+            # Construction des joueurs
+            players = [
+                Player(name="Hero", stack=1500, position=Position.DEALER, cards=hero_card_objects, is_active=True),
+                Player(name="Opponent_1", stack=1500, position=Position.SMALL_BLIND, is_active=True),
+                Player(name="Opponent_2", stack=1500, position=Position.BIG_BLIND, is_active=True)
+            ]
+            
+            # Cartes communes
+            community_card_objects = []
+            for card_str in board_cards:
+                if len(card_str) == 2:
+                    community_card_objects.append(Card(rank=card_str[0], suit=card_str[1].lower()))
+            
+            # État de jeu
+            game_state = GameState(
+                players=players,
+                community_cards=community_card_objects,
+                pot=detected_elements.get("pot", 150),
+                small_blind=25,
+                big_blind=50,
+                current_player=0,
+                betting_round=phase_hint
+            )
+            
+            # Calcul recommandation
+            print("🧠 Calcul recommandation avec données utilisateur...")
+            recommendation_result = poker_engine.get_recommended_action(
+                game_state, Position.DEALER, aggressiveness=0.5
+            )
+            
+            recommendation = {
+                "action": recommendation_result.action,
+                "confidence": recommendation_result.confidence,
+                "reasoning": recommendation_result.reasoning,
+                "hand_strength": recommendation_result.hand_strength,
+                "pot_odds": recommendation_result.pot_odds,
+                "phase": recommendation_result.phase,
+                "equity": recommendation_result.equity,
+                "hand_type": recommendation_result.hand_type,
+                "outs": recommendation_result.outs,
+                "implied_odds": recommendation_result.implied_odds,
+                "position_factor": recommendation_result.position_factor,
+                "icm_factor": recommendation_result.icm_factor
+            }
+            
+            print(f"💡 Recommandation finale: {recommendation_result.action.upper()} ({recommendation_result.confidence:.1%})")
+            
+        except Exception as e:
+            print(f"❌ Erreur calcul recommandation: {e}")
+            recommendation = {
+                "action": "fold",
+                "confidence": 0.5,
+                "reasoning": f"Erreur calcul: {str(e)}",
+                "error": True
+            }
+        
+        # Création du résultat final
+        processing_time = time.time() - start_time
+        
+        game_state_dict = None
+        if game_state:
+            game_state_dict = {
+                "players": [{
+                    "name": p.name,
+                    "stack": p.stack,
+                    "position": p.position.value if hasattr(p.position, 'value') else str(p.position),
+                    "current_bet": p.current_bet,
+                    "is_active": p.is_active,
+                    "cards": [f"{c.rank}{c.suit}" for c in p.cards] if p.cards else None
+                } for p in game_state.players],
+                "community_cards": [f"{c.rank}{c.suit}" for c in game_state.community_cards],
+                "pot": game_state.pot,
+                "small_blind": game_state.small_blind,
+                "big_blind": game_state.big_blind,
+                "betting_round": game_state.betting_round
+            }
+        
+        analysis_result = PokerAnalysisResult(
+            session_id=session_id,
+            detected_elements=detected_elements,
+            game_state=game_state_dict,
+            recommendation=recommendation,
+            confidence=1.0,
+            processing_time=processing_time,
+            analysis_type="user_completed"
+        )
+        
+        print(f"✅ Analyse complétée avec données utilisateur en {processing_time:.2f}s")
+        return analysis_result.dict()
+        
+    except Exception as e:
+        processing_time = time.time() - start_time
+        print(f"❌ Erreur complétion analyse: {str(e)}")
+        return {
+            "error": "CompletionError",
+            "message": f"Erreur complétion: {str(e)}",
+            "processing_time": processing_time
         }
 
 async def save_analysis_async(analysis_result: PokerAnalysisResult):
