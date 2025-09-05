@@ -470,9 +470,12 @@ def get_google_vision_ocr():
     global google_vision_ocr
     if google_vision_ocr is None:
         try:
+            print("🔄 Initialisation Google Vision OCR...")
             google_vision_ocr = GoogleVisionCardRecognizer()
+            print("✅ Google Vision OCR initialisé avec succès")
         except Exception as e:
             print(f"⚠️ Google Vision OCR initialization failed: {e}")
+            print("🔄 Utilisation du système de fallback")
             # Return a fallback object
             google_vision_ocr = FallbackVisionRecognizer()
     return google_vision_ocr
