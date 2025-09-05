@@ -429,74 +429,88 @@ class AdvancedPokerEngine:
                      aggressiveness: float, bet_to_call: int, stack: int) -> Tuple[str, float, str]:
         """Logique de décision avancée"""
         
-        reasons = []
-        
-        # Décision basée sur l'équité et les pot odds
-        if bet_to_call == 0:  # Pas de mise à suivre
-            if equity >= 0.6:
-                action = 'raise'
-                confidence = 0.85
-                reasons.append(f"Main forte ({equity:.1%}) - Value bet")
-            elif equity >= 0.4:
-                action = 'call' if phase == 'early' else 'raise'
-                confidence = 0.70
-                reasons.append(f"Main décente ({equity:.1%}) - Jouable")
-            else:
-                action = 'fold' if phase in ['early', 'middle'] else 'call'
-                confidence = 0.60
-                reasons.append(f"Main faible ({equity:.1%}) - Prudence requise")
-        
-        else:  # Il y a une mise à suivre
-            # Calcul des odds requis
-            pot_equity_needed = 1 / (pot_odds + 1) if pot_odds > 0 else 0.5
+        try:
+            reasons = []
             
-            if equity >= pot_equity_needed * 1.2:  # 20% de marge
+            # Protection contre les valeurs None
+            equity = equity if equity is not None else 0.3
+            pot_odds = pot_odds if pot_odds is not None else 0.0
+            outs = outs if outs is not None else 0
+            bet_to_call = bet_to_call if bet_to_call is not None else 0
+            stack = stack if stack is not None else 1000
+            aggressiveness = max(0.0, min(1.0, aggressiveness if aggressiveness is not None else 0.5))
+            
+            # Décision basée sur l'équité et les pot odds
+            if bet_to_call == 0:  # Pas de mise à suivre
+                if equity >= 0.6:
+                    action = 'raise'
+                    confidence = 0.85
+                    reasons.append(f"Main forte ({equity:.1%}) - Value bet")
+                elif equity >= 0.4:
+                    action = 'call' if phase == 'early' else 'raise'
+                    confidence = 0.70
+                    reasons.append(f"Main décente ({equity:.1%}) - Jouable")
+                else:
+                    action = 'fold' if phase in ['early', 'middle'] else 'call'
+                    confidence = 0.60
+                    reasons.append(f"Main faible ({equity:.1%}) - Prudence requise")
+            
+            else:  # Il y a une mise à suivre
+                # Calcul des odds requis avec protection
+                pot_equity_needed = 1 / (pot_odds + 1) if pot_odds > 0 else 0.5
+                
+                if equity >= pot_equity_needed * 1.2:  # 20% de marge
+                    action = 'call'
+                    confidence = 0.80
+                    reasons.append(f"Équité ({equity:.1%}) > Odds requises ({pot_equity_needed:.1%})")
+                elif equity >= pot_equity_needed and outs >= 8:
+                    action = 'call'
+                    confidence = 0.65
+                    reasons.append(f"Draw avec {outs} outs - Odds correctes")
+                elif equity >= 0.7:
+                    action = 'raise'
+                    confidence = 0.90
+                    reasons.append(f"Main premium ({equity:.1%}) - Value raise")
+                else:
+                    action = 'fold'
+                    confidence = 0.75
+                    reasons.append(f"Équité insuffisante ({equity:.1%}) vs odds ({pot_equity_needed:.1%})")
+            
+            # Ajustements selon la phase
+            if phase == 'late' and action == 'fold' and equity >= 0.3:
                 action = 'call'
-                confidence = 0.80
-                reasons.append(f"Équité ({equity:.1%}) > Odds requises ({pot_equity_needed:.1%})")
-            elif equity >= pot_equity_needed and outs >= 8:
-                action = 'call'
-                confidence = 0.65
-                reasons.append(f"Draw avec {outs} outs - Odds correctes")
-            elif equity >= 0.7:
+                confidence = max(0.5, confidence - 0.2)
+                reasons.append("Ajustement phase tardive - Plus large")
+            
+            if phase == 'heads_up' and action == 'fold' and equity >= 0.35:
                 action = 'raise'
-                confidence = 0.90
-                reasons.append(f"Main premium ({equity:.1%}) - Value raise")
-            else:
-                action = 'fold'
-                confidence = 0.75
-                reasons.append(f"Équité insuffisante ({equity:.1%}) vs odds ({pot_equity_needed:.1%})")
-        
-        # Ajustements selon la phase
-        if phase == 'late' and action == 'fold' and equity >= 0.3:
-            action = 'call'
-            confidence = max(0.5, confidence - 0.2)
-            reasons.append("Ajustement phase tardive - Plus large")
-        
-        if phase == 'heads_up' and action == 'fold' and equity >= 0.35:
-            action = 'raise'
-            confidence = max(0.6, confidence - 0.1)
-            reasons.append("Heads-up - Jeu agressif requis")
-        
-        # Ajustements ICM
-        if icm_factor > 1.1 and action == 'raise' and equity < 0.8:
-            action = 'call'
-            confidence = max(0.5, confidence - 0.15)
-            reasons.append("Ajustement ICM - Plus conservateur")
-        
-        # Ajustements d'agressivité
-        aggression_modifier = (aggressiveness - 0.5) * 0.2
-        confidence = max(0.1, min(0.95, confidence + aggression_modifier))
-        
-        if aggressiveness > 0.7 and action == 'call' and equity >= 0.5:
-            action = 'raise'
-            reasons.append("Style agressif appliqué")
-        elif aggressiveness < 0.3 and action == 'raise' and equity < 0.7:
-            action = 'call'
-            reasons.append("Style conservateur appliqué")
-        
-        reasoning = " | ".join(reasons)
-        return action, confidence, reasoning
+                confidence = max(0.6, confidence - 0.1)
+                reasons.append("Heads-up - Jeu agressif requis")
+            
+            # Ajustements ICM avec protection
+            icm_factor = icm_factor if icm_factor is not None else 1.0
+            if icm_factor > 1.1 and action == 'raise' and equity < 0.8:
+                action = 'call'
+                confidence = max(0.5, confidence - 0.15)
+                reasons.append("Ajustement ICM - Plus conservateur")
+            
+            # Ajustements d'agressivité
+            aggression_modifier = (aggressiveness - 0.5) * 0.2
+            confidence = max(0.1, min(0.95, confidence + aggression_modifier))
+            
+            if aggressiveness > 0.7 and action == 'call' and equity >= 0.5:
+                action = 'raise'
+                reasons.append("Style agressif appliqué")
+            elif aggressiveness < 0.3 and action == 'raise' and equity < 0.7:
+                action = 'call'
+                reasons.append("Style conservateur appliqué")
+            
+            reasoning = " | ".join(reasons) if reasons else "Décision basique"
+            return action, confidence, reasoning
+            
+        except Exception as e:
+            print(f"Erreur make_decision: {e}")
+            return 'fold', 0.3, f'Erreur décision: {str(e)}'
 
     def get_position_factor(self, position: Position, phase: str) -> float:
         """Facteur de position selon la phase"""
