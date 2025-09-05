@@ -239,8 +239,8 @@ function App() {
       const ctx = canvas.getContext('2d');
       
       // Optimisation : résolution adaptée à la phase MAIS PLUS PETITE
-      const targetWidth = phase === 'preflop' ? 800 : 1000; // Réduit drastiquement
-      const targetHeight = phase === 'preflop' ? 450 : 600;  // Réduit drastiquement
+      const targetWidth = 640;   // Taille fixe ultra-optimisée pour vitesse
+      const targetHeight = 360;  // Taille fixe ultra-optimisée pour vitesse
       
       canvas.width = targetWidth;
       canvas.height = targetHeight;
