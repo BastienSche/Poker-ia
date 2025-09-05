@@ -11,18 +11,18 @@ class PokerImageProcessor:
     """Processeur d'images optimisé pour les tables de poker"""
     
     def __init__(self):
-        # Résolution optimale pour l'analyse (équilibre qualité/vitesse)
-        self.target_width = 1280
-        self.target_height = 720
-        # Qualité JPEG optimisée
-        self.jpeg_quality = 75
+        # Résolution ULTRA-OPTIMISÉE pour vitesse maximale
+        self.target_width = 800  # Réduit encore plus
+        self.target_height = 450  # Réduit encore plus
+        # Qualité JPEG réduite pour vitesse
+        self.jpeg_quality = 60  # Réduit pour vitesse
         
     def optimize_image_for_poker_analysis(self, image_base64: str) -> str:
         """
-        Optimise une image pour l'analyse de poker :
-        - Redimensionnement intelligent
-        - Amélioration du contraste et de la netteté
-        - Compression optimisée
+        Optimise une image pour l'analyse ULTRA-RAPIDE :
+        - Redimensionnement agressif
+        - Compression rapide
+        - Traitement minimal
         """
         try:
             # Décodage de l'image
@@ -33,14 +33,14 @@ class PokerImageProcessor:
             if image.mode != 'RGB':
                 image = image.convert('RGB')
             
-            # Redimensionnement intelligent en conservant les proportions
-            image = self._smart_resize(image)
+            # Redimensionnement AGRESSIF pour vitesse
+            image = self._fast_resize(image)
             
-            # Amélioration pour la reconnaissance de cartes
-            image = self._enhance_for_cards(image)
+            # Amélioration LÉGÈRE seulement
+            image = self._light_enhance(image)
             
-            # Compression optimisée
-            optimized_base64 = self._compress_image(image)
+            # Compression RAPIDE
+            optimized_base64 = self._fast_compress(image)
             
             return optimized_base64
             
