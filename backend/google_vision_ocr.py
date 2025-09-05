@@ -304,6 +304,26 @@ class GoogleVisionCardRecognizer:
             print(f"🔑 Utilisation clé: ***{self.api_key[-4:]}")
             print(f"🌐 URL: {self.api_url}")
             
+            # DIAGNOSTIC IMAGE
+            image_size_bytes = len(image_base64) * 3 / 4  # Approximation taille décodée
+            print(f"📊 IMAGE DIAGNOSTICS:")
+            print(f"   - Taille base64: {len(image_base64):,} caractères")
+            print(f"   - Taille estimée: {image_size_bytes/1024:.1f} KB")
+            
+            # Vérifier si l'image semble valide
+            if len(image_base64) < 1000:
+                print("⚠️ ATTENTION: Image très petite, peut causer problème OCR")
+            elif len(image_base64) > 10000000:  # 10MB
+                print("⚠️ ATTENTION: Image très grande, peut causer timeout")
+            
+            # Test rapide du format
+            if image_base64.startswith('/9j/'):
+                print("📷 Format détecté: JPEG")
+            elif image_base64.startswith('iVBORw0KGgo'):
+                print("📷 Format détecté: PNG")
+            else:
+                print("⚠️ Format image non reconnu")
+            
             # Configuration spécialisée pour tables de poker
             request_data = {
                 "requests": [
@@ -343,7 +363,7 @@ class GoogleVisionCardRecognizer:
                 url_with_key,
                 headers=headers,
                 json=request_data,
-                timeout=15  # Timeout plus long pour traitement complexe
+                timeout=20  # Timeout plus long pour images HD
             )
             
             print(f"📊 RÉPONSE GOOGLE API: Status {response.status_code}")
@@ -363,21 +383,56 @@ class GoogleVisionCardRecognizer:
                     text_annotations = response_data.get('textAnnotations', [])
                     localized_objects = response_data.get('localizedObjectAnnotations', [])
                     
+                    # DIAGNOSTIC DÉTAILLÉ DES RÉSULTATS
+                    print(f"🔍 ANALYSE DÉTAILLÉE GOOGLE VISION:")
+                    print(f"   - Annotations texte: {len(text_annotations)}")
+                    print(f"   - Objets localisés: {len(localized_objects)}")
+                    
+                    if len(text_annotations) == 0:
+                        print("❌ AUCUN TEXTE DÉTECTÉ - Possibles causes:")
+                        print("   • Image trop sombre/peu contrastée")
+                        print("   • Cartes trop petites dans l'image")
+                        print("   • Resolution trop faible")
+                        print("   • Pas de texte visible (cartes faces cachées?)")
+                    else:
+                        # Log des premiers textes détectés
+                        print("📝 TEXTES DÉTECTÉS (premiers 10):")
+                        for i, ann in enumerate(text_annotations[:10]):
+                            text = ann.get('description', '')
+                            confidence = ann.get('confidence', 0)
+                            vertices = ann.get('boundingPoly', {}).get('vertices', [])
+                            if vertices:
+                                x = sum(v.get('x', 0) for v in vertices) / len(vertices)
+                                y = sum(v.get('y', 0) for v in vertices) / len(vertices)
+                                print(f"   [{i}] '{text}' (conf: {confidence:.2f}) à ({x:.0f},{y:.0f})")
+                    
+                    if len(localized_objects) > 0:
+                        print("🎯 OBJETS DÉTECTÉS:")
+                        for obj in localized_objects[:5]:
+                            name = obj.get('name', 'Unknown')
+                            confidence = obj.get('score', 0)
+                            print(f"   - {name} (conf: {confidence:.2f})")
+                    
                     result = {
                         'full_text': '',
                         'individual_texts': [],
                         'text_annotations': [],
                         'objects': localized_objects,
-                        'raw_response': response_data
+                        'raw_response': response_data,
+                        'diagnostic': {
+                            'image_size_kb': image_size_bytes/1024,
+                            'text_count': len(text_annotations),
+                            'object_count': len(localized_objects)
+                        }
                     }
                     
                     if text_annotations:
                         result['full_text'] = text_annotations[0].get('description', '')
                         result['individual_texts'] = [ann.get('description', '') for ann in text_annotations[1:]]
                         result['text_annotations'] = text_annotations
+                        print(f"📖 TEXTE COMPLET: '{result['full_text'][:200]}...'")
                     
                     print(f"✅ SUCCÈS GOOGLE VISION API: {len(text_annotations)} textes, {len(localized_objects)} objets détectés")
-                    print(f"📝 Texte détecté: '{result['full_text'][:100]}...'")
                     
                     return result
                 else:
@@ -411,7 +466,7 @@ class GoogleVisionCardRecognizer:
                 
         except requests.exceptions.Timeout:
             print("❌ TIMEOUT - Google Vision API ne répond pas")
-            raise Exception("TIMEOUT - Google Vision API ne répond pas dans les 15 secondes")
+            raise Exception("TIMEOUT - Google Vision API ne répond pas dans les 20 secondes")
             
         except requests.exceptions.ConnectionError:
             print("❌ ERREUR CONNEXION - Impossible de contacter Google Vision API")
