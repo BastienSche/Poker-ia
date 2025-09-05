@@ -321,9 +321,9 @@ function App() {
       addLog(`📷 Capture pour phase ${phase}...`, 'info');
       const ctx = canvas.getContext('2d');
       
-      // Optimisation : résolution adaptée à la phase MAIS PLUS PETITE
-      const targetWidth = 640;   // Taille fixe ultra-optimisée pour vitesse
-      const targetHeight = 360;  // Taille fixe ultra-optimisée pour vitesse
+      // Optimisation : résolution HAUTE QUALITÉ pour OCR
+      const targetWidth = 1920;   // FULL HD pour Google Vision
+      const targetHeight = 1080;  // FULL HD pour Google Vision
       
       canvas.width = targetWidth;
       canvas.height = targetHeight;
