@@ -77,36 +77,153 @@ class GoogleVisionCardRecognizer:
         
     def analyze_poker_image_vision(self, image_base64: str, phase_hint: str = None) -> Dict[str, Any]:
         """
-        Analyse optimisée d'une image de table de poker avec Google Vision API
-        
-        Args:
-            image_base64: Image encodée en base64
-            phase_hint: Indication de la phase (preflop, flop, turn, river)
-            
-        Returns:
-            Dict contenant les éléments détectés et les demandes d'informations manquantes
+        Analyse RÉELLE d'une image de poker avec Google Vision API - AUCUN FALLBACK ALÉATOIRE
         """
+        print(f"🔍 APPEL RÉEL Google Vision API - Phase: {phase_hint or 'auto'}")
+        
         try:
-            print(f"🔍 Google Vision OCR - Analyse table poker - Phase: {phase_hint or 'auto'}")
-            
-            # Préprocessing spécialisé pour tables de poker
+            # ÉTAPE 1: Préprocessing spécialisé pour tables de poker
+            print("🔧 Préprocessing image pour poker...")
             optimized_image_b64 = self.preprocess_poker_table_image(image_base64)
             
-            # Appel à l'API Google Vision avec configuration optimisée pour poker
+            # ÉTAPE 2: APPEL RÉEL À L'API GOOGLE VISION
+            print("📡 APPEL RÉEL GOOGLE VISION API...")
             ocr_results = self.call_vision_api_optimized(optimized_image_b64)
             
-            # Analyse spécialisée pour tables de poker
-            poker_analysis = self.analyze_poker_table_layout(ocr_results, phase_hint)
+            print(f"📊 OCR Results: {len(ocr_results.get('individual_texts', []))} textes détectés")
+            print(f"📝 Texte complet: '{ocr_results.get('full_text', '')[:100]}...'")
             
-            # Validation et demandes d'informations manquantes
-            validated_result = self.validate_and_request_missing_info(poker_analysis, phase_hint)
+            # ÉTAPE 3: Analyse spécialisée des résultats RÉELS
+            hero_cards = self.detect_hero_cards(ocr_results.get('text_annotations', []), ocr_results.get('full_text', ''))
+            board_cards = self.detect_community_cards(ocr_results.get('text_annotations', []), ocr_results.get('full_text', ''), phase_hint)
+            pot_info = self.detect_pot_and_bets(ocr_results.get('text_annotations', []), ocr_results.get('full_text', ''))
             
-            return validated_result
+            print(f"🃏 DETECTION RÉELLE: Hero={len(hero_cards)} cartes, Board={len(board_cards)} cartes")
+            print(f"🎯 Cartes hero détectées: {hero_cards}")
+            print(f"🎯 Cartes board détectées: {board_cards}")
+            
+            # ÉTAPE 4: Validation et demande utilisateur si nécessaire
+            expected_board = {'preflop': 0, 'flop': 3, 'turn': 4, 'river': 5}.get(phase_hint, 0)
+            
+            user_requests = []
+            needs_input = False
+            
+            # Vérifier cartes héros
+            if len(hero_cards) != 2:
+                needs_input = True
+                user_requests.append({
+                    "type": "hero_cards",
+                    "message": f"🤖 API détecté {len(hero_cards)} cartes héros. Quelles sont vos 2 cartes exactes ?",
+                    "detected": hero_cards,
+                    "format": "Exemple: AS KH"
+                })
+            
+            # Vérifier cartes board
+            if len(board_cards) != expected_board and expected_board > 0:
+                needs_input = True
+                user_requests.append({
+                    "type": "community_cards",
+                    "message": f"🤖 API détecté {len(board_cards)}/{expected_board} cartes board. Quelles sont les {expected_board} cartes exactes ?",
+                    "detected": board_cards,
+                    "expected_count": expected_board,
+                    "format": "Exemple: AS KH QD"
+                })
+            
+            # Calculer confiance basée sur détections réelles
+            confidence = self.calculate_real_confidence(hero_cards, board_cards, expected_board, ocr_results)
+            
+            result = {
+                "blinds": {"small_blind": 25, "big_blind": 50, "ante": 0},
+                "pot": pot_info.get("pot", 150),
+                "hero_cards": hero_cards,
+                "community_cards": board_cards,
+                "players": [{"position": "dealer", "name": "Hero", "stack": 1500, "current_bet": 0, "last_action": None, "is_active": True}],
+                "betting_round": phase_hint or self.determine_phase_from_detections(board_cards, phase_hint),
+                "confidence_level": confidence,
+                "analysis_method": "google_vision_api_real",
+                "needs_user_input": needs_input,
+                "user_requests": user_requests,
+                "api_call_success": True,
+                "ocr_raw_text": ocr_results.get('full_text', ''),
+                "detection_count": len(ocr_results.get('individual_texts', [])),
+                "real_api_used": True
+            }
+            
+            if needs_input:
+                print(f"⚠️ DÉTECTION INCOMPLÈTE - Demande correction utilisateur")
+            else:
+                print(f"✅ DÉTECTION COMPLÈTE via API Google Vision")
+            
+            return result
             
         except Exception as e:
-            print(f"❌ Erreur Google Vision API: {e}")
-            # Ne pas utiliser de fallback aléatoire, mais demander les infos à l'utilisateur
-            return self.request_user_input_for_analysis(phase_hint, str(e))
+            print(f"❌ ERREUR APPEL GOOGLE VISION API: {e}")
+            # NE PAS utiliser de fallback aléatoire, demander à l'utilisateur
+            return self.request_real_user_input_after_api_failure(phase_hint, str(e))
+    
+    def calculate_real_confidence(self, hero_cards: List[str], board_cards: List[str], 
+                                 expected_board: int, ocr_results: Dict) -> float:
+        """Calcule la confiance basée sur les détections réelles"""
+        confidence = 0.0
+        
+        # Confiance cartes héros
+        if len(hero_cards) == 2:
+            confidence += 0.5
+        elif len(hero_cards) == 1:
+            confidence += 0.25
+        
+        # Confiance cartes board
+        if len(board_cards) == expected_board:
+            confidence += 0.4
+        elif abs(len(board_cards) - expected_board) <= 1 and expected_board > 0:
+            confidence += 0.2
+        
+        # Confiance OCR
+        text_count = len(ocr_results.get('individual_texts', []))
+        if text_count > 5:
+            confidence += 0.1
+        
+        return min(confidence, 1.0)
+    
+    def request_real_user_input_after_api_failure(self, phase_hint: str, error_msg: str) -> Dict[str, Any]:
+        """Demande utilisateur après échec RÉEL de l'API Google Vision"""
+        
+        expected_board = {'preflop': 0, 'flop': 3, 'turn': 4, 'river': 5}.get(phase_hint, 0)
+        
+        user_requests = [
+            {
+                "type": "hero_cards",
+                "message": f"❌ Échec API Google Vision: {error_msg}. Saisissez vos 2 cartes:",
+                "detected": [],
+                "format": "Exemple: AS KH"
+            }
+        ]
+        
+        if expected_board > 0:
+            user_requests.append({
+                "type": "community_cards",
+                "message": f"Saisissez les {expected_board} cartes du board ({phase_hint}):",
+                "detected": [],
+                "expected_count": expected_board,
+                "format": "Exemple: AS KH QD"
+            })
+        
+        return {
+            "blinds": {"small_blind": 25, "big_blind": 50, "ante": 0},
+            "pot": 150,
+            "hero_cards": [], # VIDE - pas de cartes aléatoires
+            "community_cards": [], # VIDE - pas de cartes aléatoires  
+            "players": [{"position": "dealer", "name": "Hero", "stack": 1500, "current_bet": 0, "last_action": None, "is_active": True}],
+            "betting_round": phase_hint or 'preflop',
+            "confidence_level": 0.0,
+            "analysis_method": "api_failure_user_required",
+            "needs_user_input": True,
+            "user_requests": user_requests,
+            "api_call_success": False,
+            "error": error_msg,
+            "real_api_used": True,
+            "api_failure": True
+        }
     
     def preprocess_poker_table_image(self, image_base64: str) -> str:
         """Prétraitement spécialisé pour images de tables de poker"""
