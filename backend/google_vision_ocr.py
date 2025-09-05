@@ -1,6 +1,6 @@
 """
-Intégration Google Vision API pour reconnaissance de cartes de poker
-Remplace le système OpenCV par une reconnaissance OCR précise
+Moteur de vision Google Cloud Vision API pour reconnaissance de cartes de poker
+AVEC interprétation IA générative pour structurer les résultats
 """
 import os
 import io
@@ -14,6 +14,10 @@ from typing import List, Dict, Tuple, Optional, Any
 import logging
 from dotenv import load_dotenv
 from pathlib import Path
+import asyncio
+
+# Import de l'interpréteur IA
+from ai_poker_interpreter import get_ai_interpreter
 
 # Load environment variables
 ROOT_DIR = Path(__file__).parent
