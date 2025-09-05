@@ -20,7 +20,7 @@ import time
 # Import du moteur de poker AVANCÉ
 from advanced_poker_engine import AdvancedPokerEngine, GameState, Player, Card, Position
 from image_processor import PokerImageProcessor
-from free_vision_engine import free_vision
+from google_vision_ocr import google_vision_ocr
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -191,7 +191,7 @@ async def analyze_screen_capture(data: ScreenCaptureData):
         
         # *** ANALYSE 100% GRATUITE AVEC COMPUTER VISION LOCALE ***
         print("🆓 Analyse par computer vision gratuite...")
-        detected_elements = free_vision.analyze_poker_image_free(
+        detected_elements = google_vision_ocr.analyze_poker_image_free(
             optimized_image, 
             data.phase_hint
         )
