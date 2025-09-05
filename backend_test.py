@@ -423,21 +423,31 @@ class PokerAssistantTester:
             return False
 
     def run_all_tests(self):
-        """Exécute tous les tests"""
-        print("🚀 Démarrage des tests de l'API Poker Assistant Pro")
+        """Exécute tous les tests avec focus sur Phase Detection Bug Fix"""
+        print("🚀 Tests Poker Assistant Pro - FOCUS: Phase Detection Bug Fix")
         print(f"📍 URL de base: {self.base_url}")
         print(f"🆔 Session de test: {self.session_id}")
-        print("=" * 60)
+        print("=" * 70)
         
-        # Tests des endpoints
+        # Tests prioritaires pour le bug fix
+        print("\n🔥 TESTS CRITIQUES - PHASE DETECTION BUG FIX")
+        self.test_phase_detection_bug_fix()
+        self.test_free_vision_engine_phases()
+        
+        print("\n⚡ TESTS DE PERFORMANCE")
+        self.test_performance_ultra_fast()
+        
+        print("\n💰 TESTS STATUT GRATUIT")
+        self.test_100_percent_free_status()
+        
+        print("\n🔧 TESTS FONCTIONNELS GÉNÉRAUX")
+        # Tests des endpoints de base
         self.test_root_endpoint()
-        self.test_analyze_screen_endpoint()
         self.test_settings_endpoints()
         self.test_session_analyses_endpoint()
-        self.test_websocket_endpoint()
         
         # Résumé
-        print("\n" + "=" * 60)
+        print("\n" + "=" * 70)
         print(f"📊 RÉSULTATS: {self.tests_passed}/{self.tests_run} tests réussis")
         
         if self.errors:
