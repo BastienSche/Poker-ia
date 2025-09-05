@@ -396,7 +396,7 @@ function App() {
     };
   }, [stream, addLog]);
 
-  // Rendu optimisé de la recommandation (inchangé)
+  // Rendu détaillé de la recommandation avec BEAUCOUP de statistiques
   const renderRecommendation = (recommendation) => {
     if (!recommendation) return null;
 
@@ -421,43 +421,230 @@ function App() {
       all_in: 'TAPIS'
     };
 
+    // Calculs de statistiques supplémentaires
+    const handStrengthPercent = Math.round((recommendation.hand_strength || 0) * 100);
+    const confidencePercent = Math.round(recommendation.confidence * 100);
+    
+    // Évaluation de la force de la décision
+    const getDecisionStrength = () => {
+      if (confidencePercent >= 80) return { text: 'TRÈS FORTE', color: 'text-green-400' };
+      if (confidencePercent >= 60) return { text: 'FORTE', color: 'text-green-300' };
+      if (confidencePercent >= 40) return { text: 'MODÉRÉE', color: 'text-yellow-400' };
+      return { text: 'FAIBLE', color: 'text-red-400' };
+    };
+
+    const decisionStrength = getDecisionStrength();
+
     return (
       <div className={`p-6 rounded-xl border-2 ${actionColors[recommendation.action] || 'text-gray-400 bg-gray-900/20 border-gray-500/30'} recommendation-card`}>
-        <div className="flex items-center gap-4 mb-3">
+        {/* En-tête de la recommandation */}
+        <div className="flex items-center gap-4 mb-4">
           {actionIcons[recommendation.action]}
-          <h3 className="text-2xl font-bold">
-            {actionLabels[recommendation.action] || recommendation.action?.toUpperCase()}
-          </h3>
-          <div className="flex-1" />
-          <div className={`px-3 py-2 rounded-lg text-sm font-bold ${
-            recommendation.confidence > 0.7 ? 'bg-green-900/30 text-green-300' :
-            recommendation.confidence > 0.4 ? 'bg-yellow-900/30 text-yellow-300' :
-            'bg-red-900/30 text-red-300'
+          <div className="flex-1">
+            <h3 className="text-3xl font-bold mb-1">
+              {actionLabels[recommendation.action] || recommendation.action?.toUpperCase()}
+            </h3>
+            <div className="flex items-center gap-3">
+              <span className={`text-sm font-bold ${decisionStrength.color}`}>
+                🎯 DÉCISION {decisionStrength.text}
+              </span>
+              <span className="text-sm text-slate-400">
+                Phase: {recommendation.phase || 'Inconnue'}
+              </span>
+            </div>
+          </div>
+          <div className={`px-4 py-3 rounded-xl text-lg font-bold ${
+            confidencePercent >= 80 ? 'bg-green-900/40 text-green-300' :
+            confidencePercent >= 60 ? 'bg-blue-900/40 text-blue-300' :
+            confidencePercent >= 40 ? 'bg-yellow-900/40 text-yellow-300' :
+            'bg-red-900/40 text-red-300'
           }`}>
-            {Math.round(recommendation.confidence * 100)}%
+            {confidencePercent}%
           </div>
         </div>
         
-        <p className="text-base opacity-90 mb-3">{recommendation.reasoning}</p>
+        {/* Raisonnement détaillé */}
+        <div className="bg-slate-900/30 p-4 rounded-lg mb-4">
+          <h4 className="text-sm font-semibold text-slate-300 mb-2">🧠 ANALYSE STRATÉGIQUE</h4>
+          <p className="text-base text-slate-100">{recommendation.reasoning}</p>
+        </div>
         
-        {recommendation.hand_strength && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-            <div className="bg-slate-900/50 p-2 rounded-lg">
-              <div className="text-slate-400 text-xs mb-1">Force Main</div>
-              <div className="font-semibold">{Math.round(recommendation.hand_strength * 100)}%</div>
+        {/* Statistiques détaillées */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          {/* Force de main */}
+          <div className="bg-slate-900/50 p-4 rounded-lg text-center">
+            <div className="text-slate-400 text-xs mb-1">FORCE MAIN</div>
+            <div className={`text-2xl font-bold ${
+              handStrengthPercent >= 80 ? 'text-green-400' :
+              handStrengthPercent >= 60 ? 'text-blue-400' :
+              handStrengthPercent >= 40 ? 'text-yellow-400' :
+              'text-red-400'
+            }`}>
+              {handStrengthPercent}%
             </div>
-            {recommendation.pot_odds > 0 && (
-              <div className="bg-slate-900/50 p-2 rounded-lg">
-                <div className="text-slate-400 text-xs mb-1">Pot Odds</div>
-                <div className="font-semibold">{recommendation.pot_odds.toFixed(1)}:1</div>
-              </div>
-            )}
-            <div className="bg-slate-900/50 p-2 rounded-lg">
-              <div className="text-slate-400 text-xs mb-1">Phase</div>
-              <div className="font-semibold capitalize">{recommendation.phase}</div>
+            <div className="text-xs text-slate-400 mt-1">
+              {handStrengthPercent >= 80 ? 'Excellente' :
+               handStrengthPercent >= 60 ? 'Bonne' :
+               handStrengthPercent >= 40 ? 'Moyenne' : 'Faible'}
             </div>
           </div>
-        )}
+
+          {/* Pot Odds */}
+          {recommendation.pot_odds > 0 && (
+            <div className="bg-slate-900/50 p-4 rounded-lg text-center">
+              <div className="text-slate-400 text-xs mb-1">POT ODDS</div>
+              <div className="text-2xl font-bold text-purple-400">
+                {recommendation.pot_odds.toFixed(1)}:1
+              </div>
+              <div className="text-xs text-slate-400 mt-1">
+                {recommendation.pot_odds >= 3 ? 'Favorables' :
+                 recommendation.pot_odds >= 2 ? 'Correctes' : 'Défavorables'}
+              </div>
+            </div>
+          )}
+
+          {/* Équité estimée */}
+          <div className="bg-slate-900/50 p-4 rounded-lg text-center">
+            <div className="text-slate-400 text-xs mb-1">ÉQUITÉ</div>
+            <div className={`text-2xl font-bold ${
+              handStrengthPercent >= 60 ? 'text-green-400' :
+              handStrengthPercent >= 40 ? 'text-yellow-400' : 'text-red-400'
+            }`}>
+              {handStrengthPercent}%
+            </div>
+            <div className="text-xs text-slate-400 mt-1">vs adversaires</div>
+          </div>
+
+          {/* Position */}
+          <div className="bg-slate-900/50 p-4 rounded-lg text-center">
+            <div className="text-slate-400 text-xs mb-1">POSITION</div>
+            <div className="text-lg font-bold text-blue-400">
+              {recommendation.phase === 'heads_up' ? 'HU' :
+               recommendation.phase === 'late' ? 'LATE' :
+               recommendation.phase === 'middle' ? 'MID' : 'EARLY'}
+            </div>
+            <div className="text-xs text-slate-400 mt-1">
+              {recommendation.phase === 'heads_up' ? 'Heads-Up' :
+               recommendation.phase === 'late' ? 'Fin de partie' :
+               recommendation.phase === 'middle' ? 'Milieu' : 'Début'}
+            </div>
+          </div>
+        </div>
+
+        {/* Statistiques avancées */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          {/* Analyse de risque */}
+          <div className="bg-slate-900/30 p-4 rounded-lg">
+            <h5 className="text-sm font-semibold text-slate-300 mb-3">⚖️ ANALYSE DE RISQUE</h5>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Risque/Récompense:</span>
+                <span className={`font-semibold ${
+                  recommendation.action === 'raise' ? 'text-green-400' :
+                  recommendation.action === 'call' ? 'text-yellow-400' : 'text-red-400'
+                }`}>
+                  {recommendation.action === 'raise' ? 'Favorable' :
+                   recommendation.action === 'call' ? 'Neutre' : 'Évité'}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Niveau agressivité:</span>
+                <span className="font-semibold text-blue-400">
+                  {recommendation.action === 'raise' || recommendation.action === 'all_in' ? 'Élevé' :
+                   recommendation.action === 'call' ? 'Modéré' : 'Faible'}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Potentiel bluff:</span>
+                <span className="font-semibold text-purple-400">
+                  {handStrengthPercent < 30 && recommendation.action === 'raise' ? 'Possible' : 'Peu probable'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Facteurs décisionnels */}
+          <div className="bg-slate-900/30 p-4 rounded-lg">
+            <h5 className="text-sm font-semibold text-slate-300 mb-3">🎲 FACTEURS CLÉS</h5>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Stack pressure:</span>
+                <span className={`font-semibold ${
+                  recommendation.phase === 'late' ? 'text-red-400' :
+                  recommendation.phase === 'middle' ? 'text-yellow-400' : 'text-green-400'
+                }`}>
+                  {recommendation.phase === 'late' ? 'Élevée' :
+                   recommendation.phase === 'middle' ? 'Modérée' : 'Faible'}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">ICM pressure:</span>
+                <span className="font-semibold text-orange-400">
+                  {recommendation.phase === 'heads_up' ? 'Critique' :
+                   recommendation.phase === 'late' ? 'Élevée' : 'Normale'}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Fold equity:</span>
+                <span className="font-semibold text-cyan-400">
+                  {recommendation.action === 'raise' ? 'Bonne' :
+                   recommendation.action === 'call' ? 'Limitée' : 'Nulle'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Plan d'action détaillé */}
+        <div className="bg-gradient-to-r from-slate-900/50 to-slate-800/50 p-4 rounded-lg">
+          <h5 className="text-sm font-semibold text-slate-300 mb-3">📋 PLAN D'ACTION</h5>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div>
+              <span className="text-slate-400">Action principale:</span>
+              <div className={`font-bold text-lg ${
+                recommendation.action === 'raise' ? 'text-green-400' :
+                recommendation.action === 'call' ? 'text-yellow-400' :
+                recommendation.action === 'fold' ? 'text-red-400' : 'text-purple-400'
+              }`}>
+                {actionLabels[recommendation.action] || recommendation.action?.toUpperCase()}
+              </div>
+            </div>
+            <div>
+              <span className="text-slate-400">Alternative:</span>
+              <div className="font-medium text-slate-300">
+                {recommendation.action === 'raise' ? 'Call acceptable' :
+                 recommendation.action === 'call' ? 'Fold si pressure' :
+                 recommendation.action === 'fold' ? 'Pas d\'alternative' : 'Raise si bluff'}
+              </div>
+            </div>
+            <div>
+              <span className="text-slate-400">Timing:</span>
+              <div className="font-medium text-blue-400">
+                {recommendation.action === 'fold' ? 'Immédiat' :
+                 recommendation.action === 'call' ? 'Réfléchi' : 'Rapide'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Barre de confiance visuelle */}
+        <div className="mt-4">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm text-slate-400">Niveau de confiance</span>
+            <span className="text-sm font-semibold">{confidencePercent}%</span>
+          </div>
+          <div className="w-full bg-slate-700 rounded-full h-3">
+            <div 
+              className={`h-3 rounded-full transition-all duration-1000 ${
+                confidencePercent >= 80 ? 'bg-gradient-to-r from-green-500 to-green-400' :
+                confidencePercent >= 60 ? 'bg-gradient-to-r from-blue-500 to-blue-400' :
+                confidencePercent >= 40 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :
+                'bg-gradient-to-r from-red-500 to-red-400'
+              }`}
+              style={{width: `${confidencePercent}%`}}
+            />
+          </div>
+        </div>
       </div>
     );
   };
