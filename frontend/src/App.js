@@ -231,19 +231,18 @@ function App() {
     updateStatus('Analyse terminée', `${analysisData.processing_time?.toFixed(2)}s`);
   }, [addLog, updateStatus]);
 
-  // NOUVEAU : Fonction pour compléter l'analyse avec saisie utilisateur
+  // NOUVEAU : Fonction pour compléter l'analyse avec sélection de cartes
   const completeAnalysisWithUserInput = useCallback(async () => {
     if (isCompletingAnalysis) return;
     
     setIsCompletingAnalysis(true);
-    addLog('🙋 Complétion analyse avec saisie utilisateur...', 'info');
+    addLog('🙋 Complétion analyse avec sélection de cartes...', 'info');
     
     try {
-      // Parser les cartes saisies
-      const heroCards = inputHeroCards.trim().toUpperCase().split(/\s+/).filter(c => c.length >= 2);
-      const boardCards = inputBoardCards.trim().toUpperCase().split(/\s+/).filter(c => c.length >= 2);
+      const heroCards = selectedHeroCards.map(card => `${card.rank}${card.suit}`);
+      const boardCards = selectedBoardCards.map(card => `${card.rank}${card.suit}`);
       
-      addLog(`👤 Cartes saisies: Héros=${heroCards.join(' ')}, Board=${boardCards.join(' ')}`, 'info');
+      addLog(`👤 Cartes sélectionnées: Héros=${heroCards.join(' ')}, Board=${boardCards.join(' ')}`, 'info');
       
       const response = await fetch(`${API}/complete-analysis`, {
         method: 'POST',
@@ -259,7 +258,7 @@ function App() {
       
       if (response.ok) {
         const result = await response.json();
-        addLog('✅ Analyse complétée avec données utilisateur !', 'success');
+        addLog('✅ Analyse complétée avec sélection de cartes !', 'success');
         
         // Mettre à jour l'analyse actuelle
         setCurrentAnalysis(result);
@@ -270,10 +269,11 @@ function App() {
           board: result.detected_elements?.community_cards || boardCards
         });
         
-        // Masquer l'interface de saisie
+        // Masquer l'interface de sélection
         setShowCardInput(false);
-        setInputHeroCards('');
-        setInputBoardCards('');
+        setSelectedHeroCards([]);
+        setSelectedBoardCards([]);
+        setCardSelectionStep('hero');
         
         // Mettre à jour les stats
         if (result.recommendation) {
@@ -303,7 +303,44 @@ function App() {
     } finally {
       setIsCompletingAnalysis(false);
     }
-  }, [isCompletingAnalysis, inputHeroCards, inputBoardCards, currentPhase, sessionId, addLog]);
+  }, [isCompletingAnalysis, selectedHeroCards, selectedBoardCards, currentPhase, sessionId, addLog]);
+
+  // Fonctions de sélection de cartes
+  const toggleCardSelection = useCallback((rank, suit) => {
+    const cardKey = `${rank}${suit}`;
+    
+    if (cardSelectionStep === 'hero') {
+      setSelectedHeroCards(prev => {
+        const isSelected = prev.some(card => `${card.rank}${card.suit}` === cardKey);
+        if (isSelected) {
+          return prev.filter(card => `${card.rank}${card.suit}` !== cardKey);
+        } else if (prev.length < 2) {
+          return [...prev, { rank, suit }];
+        }
+        return prev;
+      });
+    } else if (cardSelectionStep === 'board') {
+      const maxBoard = { 'flop': 3, 'turn': 4, 'river': 5 }[currentPhase] || 3;
+      setSelectedBoardCards(prev => {
+        const isSelected = prev.some(card => `${card.rank}${card.suit}` === cardKey);
+        if (isSelected) {
+          return prev.filter(card => `${card.rank}${card.suit}` !== cardKey);
+        } else if (prev.length < maxBoard) {
+          return [...prev, { rank, suit }];
+        }
+        return prev;
+      });
+    }
+  }, [cardSelectionStep, currentPhase]);
+
+  const isCardSelected = useCallback((rank, suit) => {
+    const cardKey = `${rank}${suit}`;
+    if (cardSelectionStep === 'hero') {
+      return selectedHeroCards.some(card => `${card.rank}${card.suit}` === cardKey);
+    } else {
+      return selectedBoardCards.some(card => `${card.rank}${card.suit}` === cardKey);
+    }
+  }, [cardSelectionStep, selectedHeroCards, selectedBoardCards]);
 
   // NOUVELLE : Fonction d'analyse avec détection de phase
   const analyzeScreenWithPhase = useCallback(async (phaseHint = null) => {
