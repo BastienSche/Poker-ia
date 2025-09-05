@@ -330,19 +330,42 @@ class FreePokerVision:
         """Résultat de fallback en cas d'erreur"""
         import random
         
+        print(f"🔄 Génération fallback pour phase: {phase_hint}")
+        
         # Génération de données de test réalistes
         hero_cards = self.generate_random_cards(2, 'hero')
         
+        # CORRECTION: Génération exacte selon la phase demandée
         if phase_hint == 'preflop':
             board_cards = []
+            print("🃏 Fallback PREFLOP: 0 cartes board")
         elif phase_hint == 'flop':
-            board_cards = self.generate_random_cards(3, 'board')
+            board_cards = self.generate_random_cards(3, 'board') 
+            print(f"🃏 Fallback FLOP: {len(board_cards)} cartes board = {board_cards}")
         elif phase_hint == 'turn':
             board_cards = self.generate_random_cards(4, 'board')
+            print(f"🃏 Fallback TURN: {len(board_cards)} cartes board = {board_cards}")
         elif phase_hint == 'river':
             board_cards = self.generate_random_cards(5, 'board')
+            print(f"🃏 Fallback RIVER: {len(board_cards)} cartes board = {board_cards}")
         else:
-            board_cards = self.generate_random_cards(random.randint(0, 5), 'board')
+            # Auto-détection basée sur le nombre aléatoire
+            num_random = random.randint(0, 5)
+            board_cards = self.generate_random_cards(num_random, 'board')
+            print(f"🃏 Fallback AUTO: {len(board_cards)} cartes board = {board_cards}")
+        
+        # VALIDATION: Vérifier que le nombre de cartes est correct
+        expected_cards = {'preflop': 0, 'flop': 3, 'turn': 4, 'river': 5}
+        if phase_hint and phase_hint in expected_cards:
+            expected = expected_cards[phase_hint]
+            if len(board_cards) != expected:
+                print(f"❌ ERREUR FALLBACK: Phase {phase_hint} devrait avoir {expected} cartes, généré {len(board_cards)}")
+                # CORRECTION FORCÉE
+                board_cards = self.generate_random_cards(expected, 'board')
+                print(f"✅ CORRECTION: Régénéré {len(board_cards)} cartes pour {phase_hint}")
+        
+        final_phase = phase_hint or self.determine_phase(board_cards)
+        print(f"🎯 Fallback terminé: Phase={final_phase}, Board={len(board_cards)} cartes")
         
         return {
             "blinds": {"small_blind": 25, "big_blind": 50, "ante": 0},
@@ -350,7 +373,7 @@ class FreePokerVision:
             "hero_cards": hero_cards,
             "community_cards": board_cards,
             "players": [{"position": "dealer", "name": "Hero", "stack": 1500, "current_bet": 0, "last_action": None, "is_active": True}],
-            "betting_round": phase_hint or self.determine_phase(board_cards),
+            "betting_round": final_phase,
             "confidence_level": 0.6,
             "analysis_method": "fallback"
         }
