@@ -238,9 +238,9 @@ function App() {
       addLog(`📷 Capture pour phase ${phase}...`, 'info');
       const ctx = canvas.getContext('2d');
       
-      // Optimisation : résolution adaptée à la phase
-      const targetWidth = phase === 'preflop' ? 1280 : 1600; // Plus haute résolution pour le board
-      const targetHeight = phase === 'preflop' ? 720 : 900;
+      // Optimisation : résolution adaptée à la phase MAIS PLUS PETITE
+      const targetWidth = phase === 'preflop' ? 800 : 1000; // Réduit drastiquement
+      const targetHeight = phase === 'preflop' ? 450 : 600;  // Réduit drastiquement
       
       canvas.width = targetWidth;
       canvas.height = targetHeight;
