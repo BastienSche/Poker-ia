@@ -304,19 +304,30 @@ class AdvancedPokerEngine:
 
     def determine_game_phase(self, game_state: GameState) -> str:
         """Détermine la phase de jeu basée sur les stacks et blinds"""
-        active_players = [p for p in game_state.players if p.is_active]
-        if len(active_players) <= 2:
-            return 'heads_up'
-        
-        avg_stack = sum(p.stack for p in active_players) / len(active_players)
-        bb_ratio = avg_stack / game_state.big_blind if game_state.big_blind > 0 else 50
-        
-        if bb_ratio > 20:
-            return 'early'
-        elif bb_ratio > 12:
+        try:
+            active_players = [p for p in game_state.players if p.is_active and p.stack is not None]
+            if len(active_players) <= 2:
+                return 'heads_up'
+            
+            # Calcul sécurisé des stacks
+            valid_stacks = [p.stack for p in active_players if p.stack is not None and p.stack > 0]
+            if not valid_stacks:
+                return 'middle'  # Fallback par défaut
+                
+            avg_stack = sum(valid_stacks) / len(valid_stacks)
+            big_blind = game_state.big_blind if game_state.big_blind and game_state.big_blind > 0 else 50
+            
+            bb_ratio = avg_stack / big_blind
+            
+            if bb_ratio > 20:
+                return 'early'
+            elif bb_ratio > 12:
+                return 'middle'
+            else:
+                return 'late'
+        except Exception as e:
+            print(f"Erreur determine_game_phase: {e}")
             return 'middle'
-        else:
-            return 'late'
 
     def get_recommended_action(self, game_state: GameState, hero_position: Position, 
                              aggressiveness: float = 0.5) -> AnalysisResult:
